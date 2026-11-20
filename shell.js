@@ -19,7 +19,8 @@
   .sb a.sb-btn[aria-current="page"]{background:#141414;color:#fff;box-shadow:inset 0 0 0 1px #2a2a2a}
   .sb .sb-count{font:11px "Geist Mono",ui-monospace,monospace;min-width:20px;text-align:center;border-radius:999px;padding:1px 7px;background:#0070e0;color:#fff}
   .sb .sb-count:empty{display:none}
-  .sb-foot{margin-top:auto;display:grid;gap:6px;font:12px "Geist Mono",ui-monospace,monospace;color:#757575}
+  .sb-set{margin-top:auto}
+  .sb-foot{display:grid;gap:6px;font:12px "Geist Mono",ui-monospace,monospace;color:#757575}
   .sb-foot a{color:#757575;text-decoration:none}.sb-foot a:hover{color:#fff}
   .sb-worker{display:flex;align-items:center;gap:8px;font-family:Geist,system-ui,sans-serif;color:#ababab}
   .sb-worker i{width:8px;height:8px;border-radius:50%;background:#757575;flex:none}.sb-worker.on i{background:#3dd68c}.sb-worker.off i{background:#f5a524}
@@ -59,9 +60,18 @@
         ${CLIENTS.map(([k, slug, n]) => `<a class="sb-btn" data-k="${k}" href="${href(k, slug)}" ${client === k || client === slug ? 'aria-current="page"' : ""} title="${esc(n)} · threads that need our reply"><span>${esc(n)}</span><b class="sb-count">${counts[k] || ""}</b></a>`).join("")}
       </div>
       <div id="nav" hidden></div>
+      <a class="sb-btn sb-set" href="settings.html" ${page === "settings" ? 'aria-current="page"' : ""}><span>⚙ Settings</span></a>
       <div class="sb-foot"><span class="sb-worker" id="sbWorker"><i></i><span id="sbWorkerT">Checking…</span></span><span id="updated"></span><a href="#" id="sbOut">Sign out</a></div>`;
     nav.querySelector("#sbOut").onclick = e => { e.preventDefault(); window.signOut && window.signOut(); };
     if (onClient) nav.querySelectorAll("a[data-k]").forEach(a => a.onclick = e => { e.preventDefault(); setClient(a.dataset.k); history.replaceState(null, "", "?c=" + a.dataset.k); onClient(a.dataset.k); });
+  }
+  function renderClientSide(me) {
+    const nav = document.getElementById("sb"); if (!nav) return;
+    const name = (CLIENTS.find(x => x[1] === me.client) || [0, 0, me.client])[2];
+    nav.innerHTML = `<div class="sb-brand"><i aria-hidden="true"></i>Outreach</div>
+      <div class="sb-list"><a class="sb-btn" href="client.html" aria-current="page"><span>${esc(name)} overview</span></a></div>
+      <div class="sb-foot"><span>${esc(me.email)}</span><span id="updated"></span><a href="#" id="sbOut">Sign out</a></div>`;
+    nav.querySelector("#sbOut").onclick = e => { e.preventDefault(); window.signOut && window.signOut(); };
   }
   function setClient(c) { client = c || ""; render(); refreshStatus(); }
   async function refreshStatus() {
@@ -133,10 +143,34 @@
     const n = chatLog.length; if (atEnd || n !== chatSeen) box.scrollTop = box.scrollHeight; chatSeen = n;
   }
 
+  async function whoAmI() {
+    const ses = await window.whenAuthed, email = ((ses && ses.user && ses.user.email) || "").toLowerCase();
+    let {data, error} = await SB.from("allowed_users").select("role,client").eq("email", email).maybeSingle();
+    if (error) {  // before client_access.sql has run there are no role columns yet: an existing row means admin
+      const old = await SB.from("allowed_users").select("email").eq("email", email).maybeSingle();
+      data = old.data ? {role: "admin", client: null} : null;
+      if (!old.data) {  // older rules don't let a user read the list at all: fall back to "can I read the desk?"
+        const probe = await SB.from("desk_state").select("key").limit(1);
+        if (probe.data && probe.data.length) data = {role: "admin", client: null};
+      }
+    }
+    return {email, role: data ? data.role : null, client: data ? data.client : null};
+  }
+  function noAccess(email) {
+    document.body.innerHTML = `<div style="min-height:100vh;display:grid;place-items:center;background:#080808;color:#fff;font-family:Geist,system-ui,sans-serif;padding:16px">
+      <div style="max-width:420px;display:grid;gap:12px;background:#0f0f0f;border:1px solid #2a2a2a;border-radius:14px;padding:24px">
+      <b style="font-size:16px">No access yet</b><p style="margin:0;color:#ababab;font-size:14px;line-height:1.5">${esc(email)} is signed in, but hasn't been given access to the Outreach Desk. Ask MaximusLabs to add this email.</p>
+      <a href="#" id="naOut" style="color:#449afb;font-size:14px">Sign in with another account</a></div></div>`;
+    document.getElementById("naOut").onclick = e => { e.preventDefault(); window.signOut(); };
+  }
   window.Shell = {
-    mount(p, c, handler) {
+    async mount(p, c, handler) {
       page = p; client = c || ""; onClient = handler || null;
       const st = document.createElement("style"); st.textContent = css; document.head.append(st);
+      const me = await whoAmI(); window.__me = me;
+      if (!me.role) { noAccess(me.email); return; }
+      if (me.role === "client" && page !== "client") { location.replace("client.html"); return; }
+      if (me.role === "client") { renderClientSide(me); return; }
       render(); chatUI(); refreshStatus(); loadChat();
       setInterval(refreshStatus, 15000);
       setInterval(() => { if (!document.querySelector(".cb").hidden) loadChat(); }, 5000);

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Settings · Outreach Desk</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+<script src="shell.js"></script>
+<style>
+:root{--ground:#080808;--surface:#0f0f0f;--raised:#141414;--line:#2a2a2a;--line-soft:#1f1f1f;--text:#fff;--text2:#ababab;--text3:#757575;--signal:#0070e0;--sky:#449afb;--good:#3dd68c;--bad:#ff6b6b;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0;background:var(--ground);color:var(--text)}
+body{font-family:Geist,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:14px}
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+main{max-width:960px;width:100%;margin:0 auto;padding:36px 20px 64px;display:grid;gap:28px;align-content:start;min-width:0}
+h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.02em}.sub{color:var(--text3);margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px}
+.card h2{margin:0;font-size:16px;font-weight:600}
+.hint{color:var(--text3);font-size:13px;line-height:1.5}
+form.add{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+label.f{display:grid;gap:6px;font:500 11px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)}
+input,select{font:14px Geist,system-ui,sans-serif;color:var(--text);background:#080808;border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--sky)}
+select:disabled{opacity:.45}
+.btn{font:500 14px Geist,system-ui,sans-serif;border:0;border-radius:999px;padding:10px 18px;background:var(--signal);color:#fff;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#0a7ff0}.btn.ghost{background:transparent;color:var(--text2);box-shadow:inset 0 0 0 1px var(--line)}.btn.ghost:hover{color:var(--text)}
+.btn.del{background:transparent;color:var(--bad);box-shadow:inset 0 0 0 1px rgba(255,107,107,.35);padding:6px 12px;font-size:13px}
+.msg{min-height:20px;font-size:13px}.msg.ok{color:var(--good)}.msg.err{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font:500 10.5px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:11px 12px;border-bottom:1px solid var(--line-soft);color:var(--text2);vertical-align:middle}
+td.e{color:var(--text);font-weight:500;overflow-wrap:anywhere}
+.pill{font:500 10.5px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:999px}
+.pill.admin{background:rgba(68,154,251,.12);color:var(--sky)}.pill.client{background:rgba(61,214,140,.12);color:var(--good)}
+.invite{display:flex;gap:10px;align-items:center;background:#080808;border:1px dashed var(--line);border-radius:10px;padding:12px 14px}
+.invite code{flex:1;font:13px "Geist Mono",monospace;color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere}
+@media (max-width:860px){.shell{grid-template-columns:1fr}form.add{grid-template-columns:1fr}}
+</style></head><body>
+<div class="shell">
+  <nav class="sb" id="sb" aria-label="Views"></nav>
+  <main>
+    <header><h1>Settings</h1><div class="sub">Who can sign in, and what they see.</div></header>
+
+    <section class="card" aria-labelledby="h-add">
+      <h2 id="h-add">Give access</h2>
+      <p class="hint">Add the person's email. They open the desk link and click <b>Sign in with Google</b> with that same email (it must be a Google account, e.g. Gmail or Google Workspace).
+        <b>Admin</b> sees and does everything. <b>Client</b> sees only that client's overview numbers — no emails, no names, no other clients.</p>
+      <form class="add" id="add" novalidate>
+        <label class="f">Email<input id="email" type="email" placeholder="surya@easywebinar.com" autocomplete="off" required></label>
+        <label class="f">Access<select id="role"><option value="client">Client overview</option><option value="admin">Admin (everything)</option></select></label>
+        <label class="f">Client<select id="client"></select></label>
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <div class="msg" id="msg" aria-live="polite"></div>
+      <div class="invite" id="invite" hidden><code id="inviteText"></code><button class="btn ghost" type="button" id="copy">Copy</button></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-list">
+      <h2 id="h-list">People with access</h2>
+      <div style="overflow-x:auto"><table><thead><tr><th>Email</th><th>Access</th><th>Sees</th><th>Added</th><th></th></tr></thead><tbody id="list"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+    </section>
+  </main>
+</div>
+<script>
+(() => {
+  const CLIENTS = [["versatile-club", "Versatile Club"], ["easywebinar", "EasyWebinar"], ["luca", "Luca"], ["maximuslabs", "MaximusLabs"], ["oliv-ai", "Oliv AI"], ["teamvoy", "Teamvoy"]];
+  const SITE = "https://maximus-labs.github.io/outreach-desk/";
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const cname = k => (CLIENTS.find(c => c[0] === k) || [k, k])[1];
+  $("client").innerHTML = CLIENTS.map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join("");
+  $("role").onchange = () => { $("client").disabled = $("role").value === "admin"; };
+  const say = (t, cls) => { $("msg").textContent = t; $("msg").className = "msg " + (cls || ""); };
+
+  async function load() {
+    const {data, error} = await SB.from("allowed_users").select("email,role,client,added_by,added_at").order("added_at", {ascending: true});
+    if (error) { $("list").innerHTML = `<tr><td colspan="5">${esc(error.message)}</td></tr>`; return; }
+    const me = (window.__me || {}).email;
+    $("list").innerHTML = data.map(r => `<tr><td class="e">${esc(r.email)}${r.email === me ? " <span class='hint'>(you)</span>" : ""}</td>
+      <td><span class="pill ${r.role}">${r.role === "admin" ? "Admin" : "Client"}</span></td>
+      <td>${r.role === "admin" ? "Everything" : `<a href="client.html?c=${esc(r.client)}" style="color:var(--sky)">${esc(cname(r.client))} overview</a>`}</td>
+      <td>${r.added_at ? new Date(r.added_at).toLocaleDateString([], {day: "numeric", month: "short"}) : ""}${r.added_by ? " · " + esc(r.added_by.split("@")[0]) : ""}</td>
+      <td style="text-align:right">${r.email === me ? "" : `<button class="btn del" data-e="${esc(r.email)}">Remove</button>`}</td></tr>`).join("");
+    document.querySelectorAll(".btn.del").forEach(b => b.onclick = async () => {
+      if (!confirm(`Remove access for ${b.dataset.e}? They will see nothing from now on.`)) return;
+      const {error} = await SB.from("allowed_users").delete().eq("email", b.dataset.e);
+      if (error) say("Could not remove: " + error.message, "err"); else { say(`Removed ${b.dataset.e}.`, "ok"); load(); }
+    });
+  }
+
+  $("add").onsubmit = async e => {
+    e.preventDefault();
+    const email = $("email").value.trim().toLowerCase(), role = $("role").value, client = role === "client" ? $("client").value : null;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say("Enter one valid email address.", "err"); return; }
+    if (role === "admin" && !confirm(`Make ${email} an ADMIN? Admins see every client, can send emails and can change who has access.`)) return;
+    const {error} = await SB.from("allowed_users").upsert({email, role, client}, {onConflict: "email"});
+    if (error) { say("Could not save: " + error.message, "err"); return; }
+    say(`Saved. ${email} can now sign in.`, "ok"); $("email").value = "";
+    $("inviteText").textContent = `Your outreach overview is ready.\nOpen ${SITE} and click "Sign in with Google" using ${email}.`;
+    $("invite").hidden = false; load();
+  };
+  $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("inviteText").textContent); $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy", 1500); } catch (e) {} };
+
+  Shell.mount("settings", "").then(() => { if ((window.__me || {}).role === "admin") load(); });
+})();
+</script>
+</body></html>

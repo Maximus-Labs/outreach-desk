@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Outreach overview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+<script src="shell.js"></script>
+<style>
+:root{--ground:#080808;--surface:#0f0f0f;--raised:#141414;--line:#2a2a2a;--line-soft:#1f1f1f;--text:#fff;--text2:#ababab;--text3:#757575;--signal:#0070e0;--sky:#449afb;--good:#3dd68c;--warn:#f5a524;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0;background:var(--ground);color:var(--text)}
+body{font-family:Geist,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:15px;line-height:1.5}
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+main{max-width:1060px;width:100%;margin:0 auto;padding:36px 20px 64px;display:grid;gap:28px;align-content:start;min-width:0}
+h1{margin:0;font-size:30px;font-weight:600;letter-spacing:-.02em}.sub{color:var(--text3);font-size:14px;margin-top:4px}
+.pill{font:500 10.5px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:rgba(61,214,140,.12);color:var(--good)}
+.pill.quiet{background:var(--raised);color:var(--text3);box-shadow:inset 0 0 0 1px var(--line)}
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 20px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:grid;gap:4px}
+.stat b{font:500 32px "Geist Mono",monospace;letter-spacing:-.03em}
+.stat span{color:var(--text2);font-size:14px}.stat small{color:var(--text3);font-size:12.5px}
+.stat.hl b{color:var(--good)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px;min-width:0}
+.card h2{margin:0;font-size:17px;font-weight:600}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--text2)}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.chart{width:100%;height:220px}
+.out{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));gap:10px}
+.out div{background:#0b0b0b;border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;display:grid;gap:2px}
+.out b{font:500 22px "Geist Mono",monospace}.out span{color:var(--text3);font-size:13px}
+.msg{color:var(--text3);padding:24px 0}
+@media (max-width:860px){.shell{grid-template-columns:1fr}}
+</style></head><body>
+<div class="shell">
+  <nav class="sb" id="sb" aria-label="Views"></nav>
+  <main id="main"><div class="msg">Loading your overview…</div></main>
+</div>
+<script>
+(async () => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const n = v => (v === null || v === undefined || v === "") ? "–" : Number(v).toLocaleString();
+  await Shell.mount("client", "");
+  const me = window.__me || {}; if (!me.role) return;
+  const slug = me.role === "client" ? me.client : (new URLSearchParams(location.search).get("c") || "easywebinar");
+  const {data, error} = await SB.from("sheet_tabs").select("rows,updated_at").eq("tab", "site:" + slug).maybeSingle();
+  if (error || !data) { $("main").innerHTML = `<div class="msg">${error ? esc(error.message) : "Your overview isn't available yet. It is refreshed twice a day."}</div>`; return; }
+  const {updated, client: c} = data.rows, ex = c.exchange || {}, oc = c.outcomes || {};
+  document.title = `${c.name} · Outreach overview`;
+  const upd = document.getElementById("updated"); if (upd) upd.textContent = updated ? `Updated ${updated} IST` : "";
+  // last 30 days of activity: days[date] = [sent, replies, ...]
+  const days = c.days || {}, today = new Date(), pts = [];
+  for (let i = 29; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); const k = d.toISOString().slice(0, 10); const v = days[k] || [0, 0]; pts.push({k, s: +v[0] || 0, r: +v[1] || 0}); }
+  const max = Math.max(1, ...pts.map(p => Math.max(p.s, p.r)));
+  const W = 900, H = 200, L = 30, B = 22, T = 8, iw = W - L - 8, ih = H - T - B, bw = iw / pts.length;
+  const bars = pts.map((p, i) => { const x = L + i * bw, hs = p.s / max * ih, hr = p.r / max * ih;
+    return `<rect x="${x + bw * .12}" y="${T + ih - hs}" width="${bw * .38}" height="${hs}" fill="#449afb" rx="1.5"><title>${p.k}: ${p.s} sent</title></rect>
+            <rect x="${x + bw * .52}" y="${T + ih - hr}" width="${bw * .38}" height="${hr}" fill="#3dd68c" rx="1.5"><title>${p.k}: ${p.r} replies</title></rect>`; }).join("");
+  const ticks = [0, Math.round(max / 2), max].map(v => `<text x="${L - 6}" y="${T + ih - v / max * ih + 4}" text-anchor="end" fill="#757575" font-size="11">${v}</text><line x1="${L}" x2="${W - 8}" y1="${T + ih - v / max * ih}" y2="${T + ih - v / max * ih}" stroke="#1f1f1f"/>`).join("");
+  const labels = pts.filter((p, i) => i % 5 === 0 || i === pts.length - 1).map(p => { const i = pts.indexOf(p); return `<text x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle" fill="#757575" font-size="11">${new Date(p.k).toLocaleDateString([], {day: "numeric", month: "short"})}</text>`; }).join("");
+  $("main").innerHTML = `
+    <div class="head"><div><h1>${esc(c.name)}</h1><div class="sub">Link-exchange outreach by MaximusLabs${updated ? ` · updated ${esc(updated)} IST` : ""}</div></div>
+      <span class="pill ${c.sequence === "Active" ? "" : "quiet"}">${c.sequence === "Active" ? "Sending" : esc(c.sequence || "")}</span></div>
+    <div class="stats">
+      <div class="stat"><b>${n(c.sent_total ?? c.sent)}</b><span>Emails sent</span><small>${n(c.follow_ups)} of them follow-ups</small></div>
+      <div class="stat"><b>${n(c.cos_reached)}</b><span>Companies reached</span><small>${n(c.scheduled)} emails scheduled next</small></div>
+      <div class="stat"><b>${n(c.replies)}</b><span>Replies received</span><small>from ${n(c.reply_people)} people</small></div>
+      <div class="stat"><b>${n(c.open)}</b><span>Open conversations</span><small>being worked on now</small></div>
+      <div class="stat hl"><b>${n(ex.companies)}</b><span>Link exchanges</span><small>${n(ex.swaps)} placements agreed</small></div>
+      <div class="stat"><b>${n(c.queued_cos)}</b><span>Companies in the pipeline</span><small>${n(c.queued_people)} people waiting to be emailed</small></div>
+    </div>
+    <section class="card"><div class="head"><h2>Daily activity · last 30 days</h2><div class="legend"><span><i style="background:#449afb"></i>Sent</span><span><i style="background:#3dd68c"></i>Replies</span></div></div>
+      <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Emails sent and replies per day">${ticks}${bars}${labels}</svg></section>
+    <section class="card"><h2>Where the replies stand</h2><div class="out">
+      <div><b>${n(oc.live)}</b><span>Links live</span></div><div><b>${n(oc.accepted)}</b><span>Accepted</span></div>
+      <div><b>${n(oc.progress)}</b><span>In progress</span></div><div><b>${n(oc.dropped)}</b><span>Not going ahead</span></div></div></section>`;
+})();
+</script>
+</body></html>
