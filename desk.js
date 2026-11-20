@@ -103,7 +103,10 @@ function pickClient(k) { S.client = k; $("#app").classList.remove("reading"); lo
 
 // ---------------- queue ----------------
 async function loadQueue() {
-  const q = await api("/api/queue" + (S.client ? `?client=${S.client}` : "")); S.queue = q;
+  const want = S.client;  // a slower answer for a client you already left must not overwrite this one
+  const q = await api("/api/queue" + (want ? `?client=${want}` : ""));
+  if (want !== S.client) return;
+  S.queue = q;
   const term = (S.search || "").trim().toLowerCase();
   if (term) for (const k of ["reply", "done", "client", "paid", "other"])
     q[k] = q[k].filter(r => [r.who, r.domain, r.subject, r.snippet, r.client_name, r.to, r.stage].join(" ").toLowerCase().includes(term));
