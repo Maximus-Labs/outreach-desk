@@ -1,11 +1,14 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="auth.js"></script>
-<title>Outreach Desk · Monitor</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Outreach Desk</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <style>
+
 /* Layout: a dark MaximusLabs-style console. Left rail of views; Home = client cards, then Approve / Refill / Reply queues.
    Client view = card beside its settings, then the fill log; other sections are opt-in from the Sections picker. */
 :root {
@@ -184,144 +187,266 @@ details.blurb p { white-space: pre-wrap; margin: 6px 0 0; max-width: 360px }
   h1 { font-size: 26px }
 }
 @media (prefers-reduced-motion: no-preference) { .meter i { transition: width .4s ease } }
-</style>
 
+body { margin: 0 }
+.cards { align-items: stretch }
+.card { align-content: start }
+.card.refill { border-color: var(--line) }
+.client-one { display: grid; grid-template-columns: minmax(0, 520px) }
+td.partner, td.co { color: var(--text); font-weight: 500 }
+td.dr { width: 56px } .drv { display: inline-block; min-width: 30px; padding: 1px 6px; border-radius: 6px; background: var(--raised); border: 1px solid var(--line); font: 500 12.5px var(--mono); color: var(--text) }
+td.pgrp { vertical-align: top; border-right: 1px solid var(--line) } td.pgrp small { display: block; margin-top: 3px; font: 400 11.5px var(--mono); color: var(--text3) }
+#st-body tr.g0 td { border-top: 1px solid var(--line) }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface) }
+.seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--text2); background: transparent; border: 0; border-radius: var(--r-pill); padding: 6px 12px; cursor: pointer; white-space: nowrap }
+.seg button:hover { color: var(--text) }
+.seg button[aria-selected="true"] { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--line) }
+.seg button b { font-family: var(--mono); font-weight: 500; color: var(--text3); margin-left: 4px }
+.seg button[aria-selected="true"] b { color: var(--sky) }
+.scroll2 { overflow: auto } .scroll2.five { overflow-x: auto; overflow-y: auto }
+
+.top2 { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; align-items: start }
+.home-top { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: stretch }
+.home-top > .daybox { align-content: start } .home-top > #home-cal, .home-top .cal { height: 100%; box-sizing: border-box }
+.daybox ul { flex: 1 }
+.cal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 18px 18px 14px; display: grid; gap: 10px; min-width: 0 }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px }
+.cal-head h3 { font-size: 15px; font-weight: 600; margin: 0 }
+.cal-head button { font: inherit; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text2); cursor: pointer }
+.cal-head button:hover { color: var(--text); background: var(--raised) }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px }
+.cal-wd { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); text-align: center; padding: 4px 0 6px }
+.cal-day { font: inherit; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 6px 2px 7px; min-height: 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text); cursor: pointer }
+.cal-day:hover { background: var(--raised) }
+.cal-day .n { font-size: 13.5px; font-weight: 500; line-height: 1 }
+.cal-day .c { display: flex; gap: 6px; font-family: var(--mono); font-size: 11.5px; line-height: 1; min-height: 11px }
+.cal-day .c .s { color: var(--sky) }
+.cal-day .c .r { color: var(--good) }
+.cal-day .c .f, .cal-foot .f, .daybox .f, .ov-num.f { color: #f5a524 }
+.ov-num { font-family: var(--mono); margin-left: auto } .ov-num.s { color: var(--sky) } .ov-num.bad { color: var(--bad, #f05252) }
+.cal-day.today { border-color: var(--sky) }
+.cal-day.sel { background: var(--raised) }
+.cal-day.future, .cal-day.future:hover { color: var(--text3); opacity: .45; cursor: default; background: transparent }
+.cal-day.blank { visibility: hidden }
+.cal-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 12.5px; color: var(--text3); border-top: 1px solid var(--line-soft, var(--line)); padding-top: 10px }
+.cal-foot b { font-family: var(--mono); font-weight: 500 }
+.cal-foot .s { color: var(--sky) } .cal-foot .r { color: var(--good) }
+.daybox { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 18px; display: grid; gap: 12px }
+.daybox h3 { margin: 0; font-size: 15px }
+.daybox .big { display: flex; gap: 18px; font-family: var(--mono); font-size: 22px }
+.daybox .big small { font-family: inherit; font-size: 11px; color: var(--text3); margin-left: 4px; text-transform: uppercase; letter-spacing: .06em }
+.daybox .s { color: var(--sky) } .daybox .r { color: var(--good) }
+.daybox ul { list-style: none; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--line); display: grid; gap: 8px }
+.daybox li { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--text2) }
+.daybox li span:last-child { font-family: var(--mono); font-size: 13px; display: flex; gap: 12px }
+@media (max-width: 980px) { .top2, .home-top { grid-template-columns: minmax(0, 1fr) } }
+@media (max-width: 480px) { .cal { padding: 14px 10px 12px } .cal-day { min-height: 46px; padding: 5px 0 } .cal-day .c { gap: 3px; font-size: 9.5px } }
+.card { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 12px }
+.card .card-head h3 { font-size: 16px }
+.card dl { margin: 0; row-gap: 9px }
+.card dl.rowsA { grid-template-columns: max-content minmax(2.2em, max-content) max-content; justify-content: start; column-gap: 14px; align-items: baseline }
+.card dl.rowsA dd.unit { margin-left: -8px }
+.card dl.rowsA dd.num { text-align: right; font-family: var(--mono) }
+.card dl.rowsA dd.unit { text-align: left; color: var(--text3); font-size: 11.5px; white-space: nowrap }
+.card dl.rowsA .sub { margin-top: -6px }
+.card dl.rowsA dd.rrow { grid-column: 1 / -1; margin: -4px 0 2px } .rstrip { display: block; width: 100%; padding: 3px 0; background: none; border: 0; cursor: pointer } .rstrip:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px }
+.card dl.rowsA dd.num.sub { font-size: 12px; color: var(--text2) }
+.card dt, .card dd { font-size: 13px; white-space: nowrap }
+.card dt { overflow: hidden; text-overflow: ellipsis }
+.card dd { text-align: right }
+.card .two { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.25; font-size: 12px }
+.card .two small { color: var(--text3); font-size: 11px }
+.card { padding: 16px 16px 14px }
+.card .card-foot { margin-top: auto; min-height: 22px }
+.cards { grid-template-columns: repeat(4, minmax(0, 1fr)) }
+@media (max-width: 1339px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr) } }
+.top2 { align-items: stretch } .top2 > div, .top2 .card, .top2 .cal { height: 100% } .top2 .cal { box-sizing: border-box }
+.dd-btn { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; text-align: right }
+.dd-btn:hover { color: var(--sky) } .dd-btn .chev { color: var(--text3) }
+.ph { color: var(--text3); font-style: italic; font-size: 12px; margin-left: 6px }
+dialog.ov { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); padding: 0; width: min(360px, calc(100vw - 32px)); max-height: min(70vh, 520px) }
+dialog.ov::backdrop { background: rgba(0, 0, 0, .5) }
+dialog.ov header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line) }
+dialog.ov h3 { margin: 0; font-size: 14.5px }
+.ov-x { font: inherit; background: none; border: 0; color: var(--text3); cursor: pointer; font-size: 15px }
+dialog.ov ul { list-style: none; margin: 0; padding: 6px 16px; overflow: auto; max-height: calc(min(70vh, 520px) - 110px) }
+dialog.ov li { padding: 9px 0; border-bottom: 1px solid var(--line) } dialog.ov li:last-child { border: 0 }
+.ov-co { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 500 }
+.ov-names { color: var(--text3); font-size: 13px; margin-top: 3px }
+dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--text3) }
+.stamp { font-family: var(--mono); font-size: 13.5px; font-weight: 500; color: var(--sky); background: var(--sky-soft); border: 1px solid rgba(80, 160, 255, .25); padding: 7px 14px; border-radius: var(--r-pill); white-space: nowrap; align-self: start }
+.view, .view > section, section > *, .sec-head > * { min-width: 0 }
+.seg { max-width: 100% }
+.scroll2 thead th { position: sticky; top: 0; background: var(--surface); z-index: 1 }
+@media (max-width: 820px) {
+  .seg { width: 100%; flex-wrap: nowrap; overflow-x: auto }
+  .side .navlist { display: flex; flex-wrap: nowrap; overflow-x: auto; width: 100%; gap: 4px }
+  .side .navlist .navgroup { display: none }
+  .side .navbtn { flex: none }
+}
+
+.perf { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 18px; display: grid; gap: 14px; min-width: 0 }
+.perf-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px }
+.perf-head h3 { margin: 0; font-size: 15px; font-weight: 600 }
+.perf-ctl { display: flex; flex-wrap: wrap; gap: 8px }
+.perf-ctl .seg button { padding: 5px 11px; font-size: 12.5px }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px }
+.tile { font: inherit; text-align: left; cursor: pointer; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); color: var(--text2); padding: 12px 14px 13px; display: grid; gap: 8px; min-width: 0 }
+.tile:hover { border-color: var(--text3) }
+.tile .tl { display: flex; gap: 8px; align-items: center; font-size: 12.5px; line-height: 1.25 }
+.tile .box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--text3); flex: none; display: grid; place-items: center; font-size: 10px; line-height: 1 }
+.tile .tv { font-family: var(--mono); font-size: 26px; font-weight: 500; letter-spacing: -.02em; color: var(--text) }
+.tile[aria-pressed="true"] { background: var(--tc); border-color: var(--tc); color: #fff }
+.tile[aria-pressed="true"] .box { border-color: #fff; background: #fff; color: var(--tc) }
+.tile[aria-pressed="true"] .tv { color: #fff }
+.plot { position: relative; min-width: 0 }
+.plot svg { display: block; width: 100%; height: 250px; overflow: visible }
+.plot .ax { font-family: var(--mono); font-size: 10.5px; fill: var(--text3) }
+.plot .grid { stroke: var(--line-soft, #1f1f1f); stroke-width: 1 }
+.plot .base { stroke: var(--line); stroke-width: 1 }
+.plot .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round }
+.plot .xh { stroke: var(--text3); stroke-width: 1; stroke-dasharray: 3 3 }
+.tip { position: absolute; top: 0; pointer-events: none; background: var(--ground, #080808); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font-size: 12.5px; display: grid; gap: 5px; min-width: 150px; box-shadow: 0 6px 20px rgba(0,0,0,.45); z-index: 2 }
+.tip b { font-weight: 600; color: var(--text) }
+.tip div { display: flex; align-items: center; gap: 8px; color: var(--text2) }
+.tip i { width: 10px; height: 3px; border-radius: 2px; flex: none }
+.tip span { margin-left: auto; font-family: var(--mono); color: var(--text) }
+.perf-foot { font-size: 12px; color: var(--text3) }
+@media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 480px) { .tile .tv { font-size: 21px } .perf { padding: 14px 12px } }
+.navbtn .count.zero { background: var(--raised); color: var(--text3); box-shadow: inset 0 0 0 1px var(--line) }
+.src-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px }
+.src-chip { display: flex; align-items: baseline; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px }
+.src-chip b { font-family: var(--mono); font-size: 18px; font-weight: 500 }
+.src-chip span { font-size: 13px; color: var(--text) } .src-chip small { color: var(--text3); font-size: 12px }
+.tile, .tile .box { border-radius: 0 }
+.cp { display: inline-flex; border: 1px solid var(--line); background: var(--raised) }
+.cp button { font: inherit; font-size: 11.5px; padding: 3px 9px; border: 0; background: transparent; color: var(--text3); cursor: pointer }
+.cp button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--line) }
+.queue { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; display: grid; gap: 12px }
+.queue-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline }
+.queue-head h3 { margin: 0; font-size: 15px } .queue-head span { font-size: 12.5px; color: var(--text3) }
+.queue-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px }
+.q { display: grid; gap: 4px; padding: 12px 14px; background: var(--raised); border: 1px solid var(--line); color: var(--text2); font-size: 13px; text-decoration: none }
+.q:hover { border-color: var(--text3); text-decoration: none }
+.q b { font-family: var(--mono); font-size: 26px; font-weight: 500; color: var(--text) }
+.q small { color: var(--text3); font-size: 11.5px }
+.q.low { border-color: rgba(255,107,107,.45) } .q.low b { color: var(--bad) ; animation: blink 1s steps(2, start) infinite }
+@keyframes blink { 50% { opacity: .2 } }
+@media (prefers-reduced-motion: reduce) { .q.low b { animation: none } }
+.logo { width: 16px; height: 16px; border-radius: 3px; vertical-align: -3px; margin-right: 7px; background: #fff }
+.logo.none { display: inline-grid; place-items: center; background: var(--raised); color: var(--text3); font-size: 10px; box-shadow: inset 0 0 0 1px var(--line) }
+table.led th, table.led td { white-space: nowrap }
+table.led thead tr:first-child th { text-align: left; border-bottom: 1px solid var(--line) }
+table.led th.grp { color: var(--text); text-transform: none; letter-spacing: 0; font-family: inherit; font-size: 13px; font-weight: 600 }
+table.led td.gs, table.led th.gs { border-left: 1px solid var(--line) }
+table.led td.warn { color: var(--warn) } table.led td.bad { color: var(--bad) }
+table.led td.muted { color: var(--text3) }
+.copy-btn { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); background: var(--raised); color: var(--text); cursor: pointer; border-radius: var(--r-pill) }
+.copy-btn:hover { border-color: var(--text3) }
+.st-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
+.obar { display: flex; gap: 2px; border-radius: 2px; overflow: hidden; background: var(--raised) }
+.obar i { display: block; height: 100% }
+.obar i.away, .card-out .co-n i.away, .nl-l i.away { box-shadow: inset 0 0 0 1px #6b6b74 }
+.rp { gap: 10px } .rp-g { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text3) } .rp-g b { color: var(--text); font-family: var(--mono); font-weight: 500; margin-left: 3px }
+.rp-chips { margin: 0 } .rp-chips .chip b { font-family: var(--mono); font-weight: 500; margin-left: 2px } .rp-chips .chip[aria-expanded="true"] { border-color: var(--text2); background: var(--raised) }
+.rp-why { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: 13px; color: var(--text2); padding: 9px 12px; background: var(--raised); border-radius: 8px } .rp-why[hidden] { display: none }
+.tg3 { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; line-height: 1.3; padding: 5px 7px; border-radius: 7px; background: rgba(0,0,0,.28); color: var(--text2) }
+.tile[aria-pressed="true"] .tg3 { color: #fff }
+.tg3 > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap } .tg3 i { width: 7px; height: 7px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.55) } .tg3 b { font-family: var(--mono); font-weight: 500 }
+.ctag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 400; color: var(--text2); padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px }
+.ctag i { width: 7px; height: 7px; border-radius: 2px; background: var(--oc) }
+.ov-cats { display: grid; gap: 8px; padding: 12px 16px 4px }
+.nl { display: grid; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line) }
+.nl-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px }
+.nl-head h4 { margin: 0; font-size: 14px; font-weight: 600 } .nl-head span { font-size: 12.5px; color: var(--text3) }
+.nl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.nl-cell { display: grid; align-content: start; gap: 4px; padding: 12px 14px; background: var(--raised); border: 1px solid var(--line); border-top: 3px solid var(--oc) }
+.nl-cell.zero { opacity: .55 }
+.nl-l { font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 7px }
+.nl-l i { width: 9px; height: 9px; border-radius: 2px; background: var(--oc); flex: none }
+.nl-cell b { font-family: var(--mono); font-size: 26px; font-weight: 500 } .nl-cell b small { font-size: 12px; color: var(--text3); font-weight: 400 }
+.nl-cell ul { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12.5px; color: var(--text2) }
+.nl-cell li { display: flex; justify-content: space-between; gap: 8px } .nl-cell li em { font-style: normal; font-family: var(--mono); color: var(--text) }
+.nl-h { font-size: 11.5px; color: var(--text3) }
+@media (max-width: 760px) { .nl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 480px) { .nl-grid { grid-template-columns: 1fr } }
+.card-out { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line) }
+.card-out .co-l { font-size: 12px; color: var(--text3) }
+.card-out .co-n, .ov-cats .co-n { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text2) }
+.card-out .co-n i, .ov-cats .co-n i, .rf .chip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px }
+.out-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.out-cell { display: grid; gap: 3px; padding: 12px 14px; background: var(--raised); border: 1px solid var(--line); border-left: 3px solid var(--oc) }
+.out-cell span { font-size: 13px; color: var(--text2) } .out-cell b { font-family: var(--mono); font-size: 26px; font-weight: 500 }
+.out-cell small { font-size: 11.5px; color: var(--text3) }
+.rf { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; color: var(--text3) }
+.rf .chip { font: inherit; font-size: 12.5px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--raised); color: var(--text2); cursor: pointer }
+.rf .chip[aria-pressed="true"] { color: var(--text); border-color: var(--text3) }
+@media (max-width: 640px) { .out-grid { grid-template-columns: 1fr } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+</head>
+<body>
 <div class="shell">
   <nav class="side" aria-label="Views">
     <div class="brand"><i aria-hidden="true"></i>Outreach Desk</div>
     <div class="navlist" id="nav">
-      <a href="#home" id="nav-home" class="navbtn" aria-current="page"><span>Monitor</span><b class="count" id="count-home"></b></a>
+      <a href="monitor.html" class="navbtn" id="nav-home"><span>Home</span></a>
       <a href="desk.html" class="navbtn"><span>Reply desk</span></a>
       <span class="label navgroup">Clients</span>
     </div>
-    <div class="side-foot"><div id="updated">Waiting for the report…</div><a href="#" onclick="signOut();return false" style="color:var(--text3)">Sign out</a></div>
+    <div class="side-foot"><div id="updated">Loading…</div><a href="#" onclick="signOut();return false" style="color:var(--text3)">Sign out</a></div>
   </nav>
 
   <main class="wrap">
     <div id="banner" class="banner" hidden></div>
 
-    <!-- HOME -->
-    <div id="view-home" class="view">
+    <!-- HOME (team) -->
+    <div id="view-home" class="view" hidden>
       <header class="page-head">
-        <div>
-          <h1>Home</h1>
-          <div class="sub">Refreshed at 9:10 and 15:10 IST</div>
-        </div>
+        <div><h1>Home</h1><div class="sub">Refreshed after the 9:10 and 15:10 IST runs</div></div>
+        <span class="stamp" id="home-updated"></span>
       </header>
-
-      <section aria-label="Clients">
-        <div class="cards" id="cards"><div class="card empty">Client funnels load from the report.</div></div>
+      <section aria-label="Emails per day">
+        <div class="home-top"><div class="daybox" id="home-day"></div><div id="home-cal"></div></div>
       </section>
-
-      <section aria-label="Queues">
-        <div class="queues">
-          <div class="queue" id="q-approve">
-            <header><h2>Approve</h2><span class="qcount" id="qc-approve">–</span></header>
-            <ul id="ql-approve"></ul>
-          </div>
-          <div class="queue" id="q-refill">
-            <header><h2>Refill</h2><span class="qcount" id="qc-refill">–</span></header>
-            <ul id="ql-refill"></ul>
-          </div>
-          <div class="queue" id="q-reply">
-            <header><h2>Reply</h2><span class="qcount" id="qc-reply">–</span></header>
-            <ul id="ql-reply"></ul>
-          </div>
-        </div>
-      </section>
-
-      <section aria-labelledby="home-types-h">
-        <div class="sec-head"><h2 id="home-types-h">Replies by type</h2><span class="hint">Why each reply went the way it did.</span></div>
-        <div class="queues">
-          <div class="queue type-exchange"><header><div><h2>Exchange</h2><span class="why">Link-swap replies</span></div><span class="qcount" id="home-c-Exchange">–</span></header><ul id="home-l-Exchange"></ul></div>
-          <div class="queue type-paid"><header><div><h2>Paid</h2><span class="why">They only sell placements, so no exchange</span></div><span class="qcount" id="home-c-Paid">–</span></header><ul id="home-l-Paid"></ul></div>
-          <div class="queue type-partnership"><header><div><h2>Partnership</h2><span class="why">Bigger proposals: integrations, programs</span></div><span class="qcount" id="home-c-Partnership">–</span></header><ul id="home-l-Partnership"></ul></div>
-        </div>
-      </section>
+      <section aria-label="Emails scheduled"><div id="home-queue"></div></section>
+      <section aria-label="Reply outcomes"><div id="home-out"></div></section>
+      <section aria-label="Performance"><div id="home-perf"></div></section>
+      <section aria-label="Clients"><div class="cards" id="cards"></div></section>
     </div>
 
     <!-- CLIENT -->
     <div id="view-client" class="view" hidden>
       <header class="page-head">
         <h1 id="client-name">Client</h1>
-        <details class="picker" id="picker">
-          <summary class="btn">Sections</summary>
-          <div class="menu" id="picker-menu"></div>
-        </details>
+        <span class="stamp" id="client-updated"></span>
       </header>
-
-      <div class="client-top">
-        <div id="client-card"></div>
-        <form class="panel" id="settings" novalidate>
-          <label class="label" for="f-positioning">Positioning</label>
-          <textarea id="f-positioning" rows="6" placeholder="What the client is, who buys it, how it compares. Drafts use this."></textarea>
-          <label class="label" for="f-listicles">Listicles sheet</label>
-          <div class="linkrow">
-            <input id="f-listicles" type="url" placeholder="https://docs.google.com/spreadsheets/…">
-            <a id="open-listicles" href="#" target="_blank" rel="noopener" hidden>Open</a>
-          </div>
-          <div class="row-actions" id="settings-actions"><button type="submit" class="btn" id="save-settings">Save</button><span class="hint" id="settings-note"></span></div>
-        </form>
-      </div>
-
-      <section aria-labelledby="client-types-h">
-        <div class="sec-head"><h2 id="client-types-h">Replies by type</h2><span class="hint">Why each reply went the way it did.</span></div>
-        <div class="queues">
-          <div class="queue type-exchange"><header><div><h2>Exchange</h2><span class="why">Link-swap replies</span></div><span class="qcount" id="client-c-Exchange">–</span></header><ul id="client-l-Exchange"></ul></div>
-          <div class="queue type-paid"><header><div><h2>Paid</h2><span class="why">They only sell placements, so no exchange</span></div><span class="qcount" id="client-c-Paid">–</span></header><ul id="client-l-Paid"></ul></div>
-          <div class="queue type-partnership"><header><div><h2>Partnership</h2><span class="why">Bigger proposals: integrations, programs</span></div><span class="qcount" id="client-c-Partnership">–</span></header><ul id="client-l-Partnership"></ul></div>
-        </div>
-      </section>
-
-      <section data-sec="drafts" aria-labelledby="h-drafts">
-        <div class="sec-head"><h2 id="h-drafts">Replies to approve</h2><span class="hint">Sent from the client's mailbox, in the same thread.</span></div>
-        <div class="queue"><ul id="client-drafts"></ul></div>
-      </section>
-
-      <section data-sec="fills" aria-labelledby="h-fills">
-        <div class="sec-head"><h2 id="h-fills">Log data</h2><span class="hint">One row per funnel fill.</span></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Date</th><th>Source</th><th>Waiting at start</th><th>Added</th><th>Left in pool</th><th>Note</th></tr></thead>
-            <tbody id="log-fills"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section data-sec="exchanges" aria-labelledby="h-exchanges">
-        <div class="sec-head"><h2 id="h-exchanges">Exchanges</h2><span class="hint">Dates are the day of the email it came in.</span></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Company</th><th>Stage</th><th>Their page (link to us)</th><th>Our page (link to them)</th><th>Blurbs</th><th>Live link</th></tr></thead>
-            <tbody id="exchanges"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section data-sec="threads" aria-labelledby="h-threads">
+      <div class="top2"><div id="client-card"></div><div id="client-cal"></div></div>
+      <section aria-label="Performance"><div id="client-perf"></div></section>
+      <section aria-labelledby="h-st">
         <div class="sec-head">
-          <h2 id="h-threads">Threads</h2>
-          <div class="tabs" role="group" aria-label="Show threads">
-            <button type="button" data-f="needs" aria-pressed="true">Needs reply</button>
-            <button type="button" data-f="open" aria-pressed="false">All open</button>
-            <button type="button" data-f="links" aria-pressed="false">Backlinks</button>
-            <button type="button" data-f="all" aria-pressed="false">Everything</button>
-          </div>
+          <h2 id="h-st">Outreach status</h2>
+          <div class="seg" role="tablist" aria-label="Outreach status" id="seg"></div>
         </div>
-        <div class="table-wrap">
+        <div class="st-tools"><p class="hint" id="st-hint"></p><button type="button" class="copy-btn" id="copy-ex" hidden>Copy table</button></div>
+        <div class="table-wrap scroll2 five" id="st-wrap">
           <table>
-            <thead><tr><th>Company</th><th>Stage</th><th>Last from</th><th>Last message</th><th>Latest from them</th><th>Next action</th><th></th></tr></thead>
-            <tbody id="threads"></tbody>
+            <thead id="st-head"></thead>
+            <tbody id="st-body"></tbody>
           </table>
         </div>
       </section>
-
-      <section data-sec="runs" aria-labelledby="h-runs">
-        <div class="sec-head"><h2 id="h-runs">Report runs</h2><span class="hint">Twice a day.</span></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Run at</th><th>Sequence</th><th>Bank</th><th>Step 1</th><th>Pool</th><th>Scheduled</th><th>Sent</th><th>Replies</th><th>Open</th><th>Needs reply</th><th>Agreed</th><th>Backlinks</th></tr></thead>
-            <tbody id="log-runs"></tbody>
+      <section aria-labelledby="h-fills">
+        <div class="sec-head"><h2 id="h-fills">Refill log</h2><span class="hint" id="fills-when"></span></div>
+        <p class="hint">Domains added to the sequence from each source, and the queue of companies not yet emailed before and after each day.</p>
+        <div class="src-sum" id="src-sum"></div>
+        <div class="table-wrap scroll2" id="fills-wrap">
+          <table class="led">
+            <thead id="fills-head"></thead>
+            <tbody id="fills"></tbody>
           </table>
         </div>
       </section>
@@ -331,26 +456,11 @@ details.blurb p { white-space: pre-wrap; margin: 6px 0 0; max-width: 360px }
 
 <script>
 (() => {
-  // ---------- settings (the GitHub copy is built from this file with READONLY = true and a PUBLISHED id)
-  const READONLY = true;   // approvals happen in the Reply desk
-  const PUBLISHED = "supabase";
-  const SHEET = "12UxMhzyCxDelDsDqi1MtYV5D466QbZ4XA9ANIX2lbdg";
-  const SERVER = "Google Sheets", COMPOSIO = "Composio";
+  const MODE = new URLSearchParams(location.search).get("c") ? "client" : "team";            // "team" (Home) or "client" (one client's page)
+  const DATA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTPvpCzNxY6EJTCITdki-rIhAjDDUWakWFoq3HKMncW32sa2dBgDJAx_dUv00aH2WbNy99NmtJoQNyT/pub?gid=1776067897&single=true&output=csv";            // the published Site tab (CSV, one cell holding the JSON)
+  const SLUG = new URLSearchParams(location.search).get("c") || "";
+  const BASE = "/desk";            // the site's path prefix ("/desk" on GitHub Pages, "" at a domain root)
   const THRESHOLD = 30;
-  const CLIENTS = ["Versatile Club", "EasyWebinar", "Luca", "MaximusLabs"];
-  const ACCOUNTS = { "Versatile Club": "gmail_hose-fetal", "EasyWebinar": "gmail_rever-mastax", "Luca": "gmail_resize-reopen", "MaximusLabs": "gmail_flouse-second" };
-  const COL = { reply: "AA", status: "AB", to: "AC", at: "AD" };
-  const OPEN = ["New reply", "In conversation", "Agreed, awaiting link", "Wants payment", "Referred to colleague", "Out of office", "Replied, read in mailbox"];
-  const SECTIONS = [
-    { id: "fills", label: "Log data (funnel fills)", on: true },
-    { id: "drafts", label: "Replies to approve", on: false },
-    { id: "exchanges", label: "Exchanges", on: false },
-    { id: "threads", label: "Threads", on: false },
-    { id: "runs", label: "Report runs", on: false },
-  ];
-  const state = { dash: null, threads: null, runs: null, fills: null, settings: null, client: "", filter: "needs", mcp: null, busy: {}, notes: {}, open: {} };
-
-  // ---------- helpers
   const $ = id => document.getElementById(id);
   const el = (tag, attrs = {}, ...kids) => {
     const n = document.createElement(tag);
@@ -358,471 +468,535 @@ details.blurb p { white-space: pre-wrap; margin: 6px 0 0; max-width: 360px }
     for (const k of kids) if (k != null && k !== false) n.append(k);
     return n;
   };
-  const num = v => { const n = Number(String(v ?? "").replace(/,/g, "")); return Number.isFinite(n) && String(v).trim() !== "" ? n : null; };
-  const slug = n => "client-" + n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const nowIST = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 16).replace("T", " ");
-  const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
-  const names = () => [...new Set([...CLIENTS, ...((state.dash && state.dash.clients) || []).map(c => c.Client)])];
   const stagePill = s => {
     const cls = s === "Link live" ? "ok" : s === "New reply" || s === "Wants payment" ? "bad" : s === "Agreed, awaiting link" ? "info"
       : ["Declined", "Not a fit", "Bounced", "Unsubscribed"].includes(s) ? "quiet" : "warn";
     return el("span", { class: "pill " + cls, text: s || "New reply" });
   };
-  const highlightAdds = text => {
-    const pre = el("pre", { class: "body" });
-    String(text).split(/(\[ADD:[^\]]*\])/).forEach(p => pre.append(/^\[ADD:/.test(p) ? el("mark", { text: p }) : p));
-    return pre;
-  };
-  function showBanner(msg, isErr) { const b = $("banner"); b.textContent = msg; b.className = "banner" + (isErr ? " err" : ""); b.hidden = !msg; }
-  function errorText(err, what) {
-    switch (err && err.code) {
-      case "server_not_connected": return `Add the ${SERVER} connector in claude.ai Settings → Connectors to see the ${what}.`;
-      case "needs_reauth": return `Reconnect ${SERVER} in claude.ai Settings → Connectors to see the ${what}.`;
-      case "selection_required": return `Choose which ${SERVER} connector this page should use when claude.ai asks.`;
-      case "not_in_manifest": case "approval_required": case "consent_required": return `Allow this page to use ${SERVER} to see the ${what}.`;
-      case "tool_error": return `${SERVER} could not read the ${what}. Check that your Google account can open the report sheet.`;
-      case "server_unavailable": return `${SERVER} did not answer just now. The page tries again on its next refresh.`;
-      default: return `The ${what} could not be loaded (${(err && err.code) || "unknown error"}).`;
-    }
+  const link = url => url ? el("a", { href: /^https?:\/\//.test(url) ? url : "https://" + url, target: "_blank", rel: "noopener", text: url.replace(/^https?:\/\/(www\.)?/, "") }) : "–";
+  const empty = (cols, text) => el("tr", {}, el("td", { colspan: String(cols), class: "empty", text }));
+
+  // Small overlay listing companies (domain, first names under it, "N people" when more than one).
+  function overlay(title, groups, foot, catOfCo) {
+    const dlg = el("dialog", { class: "ov", "aria-label": title });
+    const cat = catOfCo ? Object.fromEntries(groups.map(g => [g.company, catOfCo(g.company)])) : null;
+    if (cat) groups = [...groups].sort((a, b) => CATS.findIndex(x => x[0] === cat[a.company]) - CATS.findIndex(x => x[0] === cat[b.company]));
+    const cn = {}; if (cat) for (const k of Object.values(cat)) { const g = G3OF[k] || k; cn[g] = (cn[g] || 0) + 1; }
+    const tag = co => { const k = cat && cat[co], m = CATS.find(x => x[0] === k); const g = G3.find(x => x[0] === G3OF[k]), r = k === "talks" && catOfCo.why ? catOfCo.why(co) : "";
+      if (k === "live") return el("span", { class: "ctag", style: "--oc:#0f7a48" }, el("i"), "Live");
+      return m && g ? el("span", { class: "ctag", style: `--oc:${g[2]}` }, el("i"), `${g[1]} · ${r || m[1]}`) : null; };
+    const close = el("button", { type: "button", class: "ov-x", "aria-label": "Close", text: "✕" });
+    close.onclick = () => dlg.close();
+    dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.append(...[el("header", {}, el("h3", { text: title }), close),
+      cat && groups.length ? el("div", { class: "ov-cats" }, g3Bar(Object.fromEntries(G3.map(([g]) => [g, cn[g] || 0])), 8),
+        el("div", { class: "co-n" }, ...G3.filter(([g]) => cn[g]).map(([g, l, col]) => el("span", {}, el("i", { style: `background:${col}` }), `${l} ${cn[g]}`)),
+          cn.live ? el("span", {}, el("i", { style: "background:#0f7a48" }), `Live ${cn.live}`) : null)) : null,
+      el("ul", {}, ...(groups.length ? groups.map(g => el("li", {},
+        el("div", { class: "ov-co" }, el("span", { text: g.company }), tag(g.company), g.people > 1 ? el("span", { class: "pill info", text: g.people + " people" }) : null,
+          ...(g.tags || []).map(t => el("span", { class: "pill warn", text: t }))),
+        el("div", { class: "ov-names", text: (g.names || []).join(" · ") || "–" }))) : [el("li", { class: "ov-names", text: "Nobody here right now." })])),
+      ...(foot ? [el("footer", { text: foot })] : [])].filter(Boolean));
+    document.body.append(dlg); dlg.showModal();
   }
 
-  // ---------- parsers
-  function parseDash(values) {
-    const out = { updated: "", clients: [], total: null, actions: [] };
-    if (!values || !values.length) return out;
-    out.updated = String((values[0] || [])[0] || "").replace(/^Outreach dashboard - updated /, "").replace(/\s*IST$/, "");
-    const hi = values.findIndex(r => r && r[0] === "Client");
-    if (hi < 0) return out;
-    const head = values[hi];
-    for (let i = hi + 1; i < values.length; i++) {
-      const r = values[i]; if (!r || !r[0]) break;
-      const o = Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""]));
-      if (r[0] === "All clients") out.total = o; else out.clients.push(o);
-    }
-    return out;
-  }
-  function parseThreads(values) {
-    if (!values || values.length < 2) return [];
-    const head = values[0];
-    return values.slice(1).map((r, i) => [r, i + 2]).filter(([r]) => r && r[0]).map(([r, row]) => {
-      const o = Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""]));
-      o.row = row;
-      o.stage = String(o["Stage override (you)"] || "").trim() || o.Stage || "New reply";
-      const rt = String(o["Reply type"] || "").trim().toLowerCase();
-      o.type = rt === "paid" ? "Paid" : rt === "partnership" ? "Partnership" : rt === "exchange" ? "Exchange" : (o.stage === "Wants payment" ? "Paid" : "Exchange");
-      return o;
-    });
-  }
-  function rowsOf(values) {
-    if (!values || values.length < 2) return [];
-    const head = values[0];
-    return values.slice(1).filter(r => r && r[0]).map(r => Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""])));
-  }
-  function parseSettings(values) {
-    const out = {};
-    (values || []).slice(1).forEach((r, i) => { if (r && r[0]) out[r[0]] = { row: i + 2, positioning: r[1] || "", listicles: r[2] || "", at: r[3] || "" }; });
-    out._next = Math.max(1, (values || []).length) + 1;
-    return out;
+  // Breakdown behind "Emails sent": the total equals the calendar's ↗ sum; bounces and follow-ups live here.
+  function sentBox(c) {
+    // Delivered = Apollo's delivered count (the report's "Emails sent"); bounced = first emails sent minus delivered.
+    const total = c.sent_total ?? c.sent ?? 0, delivered = Number(c.sent) || 0;
+    const b = delivered ? Math.max(total - delivered, 0) : (c.bounced || 0);
+    const row = (label, v, cls) => el("li", {}, el("div", { class: "ov-co" }, el("span", { text: label }), el("span", { class: "ov-num " + (cls || ""), text: String(v) })));
+    const dlg = el("dialog", { class: "ov", "aria-label": "Emails sent" });
+    const close = el("button", { type: "button", class: "ov-x", "aria-label": "Close", text: "✕" });
+    close.onclick = () => dlg.close();
+    dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.append(el("header", {}, el("h3", { text: `Emails sent · ${total}` }), close),
+      el("ul", {}, row("Emails sent (first emails)", total, "s"), row("Delivered", delivered || Math.max(total - b, 0)), row("Bounced back", b, "bad"),
+        row("Follow-ups sent", c.follow_ups || 0, "f")),
+      el("footer", { text: "Sent = every first email, the same total as the calendar's ↗. Follow-ups are counted separately." }));
+    document.body.append(dlg); dlg.showModal();
   }
 
-  // ---------- derived lists
-  const drafts = name => (state.threads || []).filter(t => ["Pending", "Sending"].includes(t["Draft status"]) && (!name || t.Client === name));
-  const needsReply = name => (state.threads || []).filter(t => t["Needs our reply"] === "Yes" && t["Draft status"] !== "Pending" && (!name || t.Client === name));
-  const TYPES = ["Exchange", "Paid", "Partnership"];
-  const replied = name => (state.threads || []).filter(t => (!name || t.Client === name) && (String(t["First reply at"] || "").trim() || t.Key.includes("|apollo|")));
-  const typeCounts = name => Object.fromEntries(TYPES.map(ty => [ty, new Set(replied(name).filter(t => t.type === ty).map(t => (t["Company domain"] || t.Key).toLowerCase())).size]));
-  const refills = () => ((state.dash && state.dash.clients) || []).filter(c => c["Refill needed?"] === "YES");
+  // Companies / People switch shared by every card (remembered in this browser).
+  let CP = "companies"; try { CP = localStorage.getItem("cp") || "companies"; } catch (e) {}
+  const cardDraws = [];
+  const setCP = m => { CP = m; try { localStorage.setItem("cp", m); } catch (e) {} cardDraws.forEach(f => f()); };
+  const peopleIn = list => (list || []).reduce((a, g) => a + (g.people || 0), 0);
+  const namesIn = list => (list || []).reduce((a, x) => a + Math.max(1, String(x.contact || "").split(" · ").filter(Boolean).length), 0);
 
-  // ---------- client card
-  function clientCard(c, linked) {
-    const needsRefill = c["Refill needed?"] === "YES";
-    const seq = c.Sequence || "Unknown";
-    const card = el("article", { class: "card" + (needsRefill ? " refill" : "") });
-    card.append(el("div", { class: "card-head" },
-      el("h3", {}, linked ? el("a", { href: "#" + slug(c.Client), text: c.Client }) : c.Client),
-      el("span", { class: "alerts" },
-        needsRefill ? el("span", { class: "pill warn", text: "Refill" }) : null,
-        el("span", { class: "pill " + (seq === "Active" ? "ok" : "quiet"), text: seq === "Active" ? "Sending" : seq }))));
-    if (state.threads) {
-      const n = typeCounts(c.Client);
-      card.append(el("div", { class: "types", role: "group", "aria-label": "Replies by type" },
-        ...TYPES.map(ty => el("div", { class: "t-" + ty.toLowerCase() }, el("b", { text: String(n[ty]) }), el("span", { text: ty })))));
-    }
-    const dl = el("dl");
-    for (const [label, key] of [["Scheduled", "Emails scheduled"], ["Sent", "Emails sent (total)"],
-      ["Replies today", "Replies today"], ["Open threads", "Open threads"],
-      ["Needs our reply", "Needs our reply"], ["Agreed, awaiting link", "Agreed, awaiting link"], ["Backlinks", "Backlinks secured"]]) {
-      const v = c[key] === "" || c[key] == null ? "–" : c[key];
-      dl.append(el("dt", { text: label }), el("dd", { class: key === "Needs our reply" && num(v) > 0 ? "hot" : null, text: v }));
-    }
-    card.append(dl);
-    const alerts = String(c.Alerts || "").split(";").map(x => x.trim()).filter(Boolean).filter(x => !/^Bank /.test(x));
-    if (alerts.length) card.append(el("div", { class: "alerts" }, ...alerts.map(x => el("span", { class: "pill warn", text: x }))));
+  function card(c, href) {
+    // Older data lacks these totals: derive them from the calendar and the bounce alert.
+    const dv = Object.values(c.days || {});
+    if (c.sent_total == null && dv.length) c.sent_total = dv.reduce((a, v) => a + (v[0] || 0), 0);
+    if (c.follow_ups == null) c.follow_ups = dv.reduce((a, v) => a + (v[2] || 0), 0);
+    const bm = (c.alerts || []).map(a => /^Bounce rate (\d+)\//.exec(a)).find(Boolean);
+    if (c.bounced == null) c.bounced = bm ? Number(bm[1]) : 0;
+    c.alerts = (c.alerts || []).filter(a => !/^Bounce rate/.test(a));
+    const card = el("article", { class: "card" });
+    const n = v => v === "" || v == null ? "–" : String(v);
+    const ex = c.exchange || { companies: 0, swaps: 0 };
+    const recv = () => overlay(`Emails received · ${n(c.replies)} companies`, c.ov_received || [], `${c.reply_people || 0} people from ${n(c.replies)} companies`, coCat(c));
+    const openOv = () => overlay(`Open threads · ${(c.ov_open || []).length} companies`, c.ov_open || [], "Sorted by where each conversation stands", coCat(c));
+    const replyOv = () => overlay(`Needs our reply · ${(c.list_reply || []).length} companies`, c.ov_reply || []);
+    const toggle = el("div", { class: "cp", role: "group", "aria-label": "Count companies or people" });
+    const body = el("div");
+    const draw = () => {
+      toggle.replaceChildren(...[["companies", "Companies"], ["people", "People"]].map(([k, lab]) => {
+        const b = el("button", { type: "button", "aria-pressed": String(CP === k), text: lab }); b.onclick = () => setCP(k); return b; }));
+      const co = CP === "companies";
+      // [label, number, unit word, onClick, highlight]
+      const rows = co ? [
+        ["Emails scheduled", n(c.queued_cos), "companies"],
+        ["Emails sent", n(c.cos_reached), "companies", () => sentBox(c)],
+        ["Emails received", n(c.replies), "companies", recv],
+        ["Open threads", String((c.ov_open || []).length), "companies", openOv],
+        ["Needs our reply", String((c.list_reply || []).length), "companies", replyOv, (c.list_reply || []).length > 0],
+        ["Needs client reply", String((c.list_waiting || []).length), "companies"],
+        ["Exchange", String(ex.companies), "companies"],
+      ] : [
+        ["Emails scheduled", n(c.scheduled), "people"],
+        ["Emails sent", n(c.sent_total ?? c.sent), "people", () => sentBox(c)],
+        ["Emails received", String(c.reply_people || 0), "people", recv],
+        ["Open threads", String(peopleIn(c.ov_open)), "people", openOv],
+        ["Needs our reply", String(peopleIn(c.ov_reply)), "people", replyOv, peopleIn(c.ov_reply) > 0],
+        ["Needs client reply", String(namesIn(c.list_waiting)), "people"],
+        ["Exchange", String(ex.swaps), "exchanges"],
+      ];
+      const dl = el("dl", { class: "rowsA" });
+      for (const [label, v, unit, open, hot] of rows) {
+        const num = el("dd", { class: "num" + (hot ? " hot" : "") });
+        const u = el("dd", { class: "unit" }, unit || "", open ? el("span", { class: "chev", "aria-hidden": "true", text: " ›" }) : null);
+        if (open) { const b = el("button", { type: "button", class: "dd-btn", "aria-haspopup": "dialog", "aria-label": `${label}: ${v} ${unit}, show list` }, v); b.onclick = open; num.append(b); u.style.cursor = "pointer"; u.onclick = open; }
+        else num.textContent = v;
+        dl.append(el("dt", { text: label }), num, u);
+        if (label === "Emails received" && c.outcomes) {   // where those replies stand, as one thin strip
+          const bk = breakdown(c.outcomes, c), gn = g3n(bk.n), gw = g3why(bk.n), strip = g3Bar(gn, 4);
+          strip.title = G3.map(([g, l]) => `${l} ${gn[g]}` + (gw[g] ? ` (${gw[g]})` : "")).join(" · ");
+          const b = el("button", { type: "button", class: "rstrip", "aria-label": `Where the replies stand: ${strip.title}. Show list` }, strip); b.onclick = recv;
+          dl.append(el("dd", { class: "rrow" }, b));
+        }
+      }
+      const o = c.outcomes;
+      body.replaceChildren(dl);
+    };
+    card.append(el("div", { class: "card-head" }, el("h3", {}, href ? el("a", { href, text: c.name }) : c.name), toggle), body);
+    card.append(el("div", { class: "alerts card-foot" }, ...(c.alerts || []).map(a => el("span", { class: "pill warn", text: a }))));
+    cardDraws.push(draw); draw();
     return card;
   }
 
-  // ---------- draft item (Approve queue and client section)
-  function draftItem(t) {
-    const li = el("li", { class: "qitem" });
-    const busy = state.busy[t.Key], n = state.notes[t.Key];
-    li.append(el("div", { class: "top" }, el("span", { class: "who", text: t["Company domain"] || "Unknown company" }), el("span", { class: "label", text: t.Client })),
-      el("div", { class: "meta", text: `To ${t["Draft to"] || "?"} · from ${t.Mailbox}` }));
-    const det = el("details", { class: "review" });
-    if (state.open[t.Key]) det.open = true;
-    det.addEventListener("toggle", () => { state.open[t.Key] = det.open; });
-    det.append(el("summary", { text: det.open ? "Hide reply" : "Review reply" }));
-    det.addEventListener("toggle", () => { det.querySelector("summary").textContent = det.open ? "Hide reply" : "Review reply"; });
-    if (t["Latest from them"]) det.append(el("blockquote", { class: "theirs", text: t["Latest from them"] }));
-    const view = highlightAdds(t["Draft reply"]);
-    det.append(view);
-    li.append(det);
-    if (n) li.append(el("p", { class: "hint " + (n.cls || ""), text: n.msg }));
-    if (t["Draft status"] === "Sending" && !busy) { li.append(el("p", { class: "hint err", text: "A send was started but not confirmed. Check the thread in Gmail first." })); return li; }
-    if (READONLY) { det.append(el("p", { class: "hint", text: "Approve this on the team's Claude page." })); return li; }
-    if (t["Draft status"] !== "Pending") return li;
-    const actions = el("div", { class: "row-actions" });
-    det.append(actions);
-    const hasAdd = /\[ADD:/.test(t["Draft reply"]);
-    const approve = el("button", { type: "button", class: "btn primary", text: busy === "send" ? "Sending…" : "Approve & send" });
-    const edit = el("button", { type: "button", class: "btn", text: "Edit" });
-    const deny = el("button", { type: "button", class: "btn danger", text: busy === "deny" ? "Discarding…" : "Deny" });
-    approve.disabled = !!busy || hasAdd || !ACCOUNTS[t.Client]; edit.disabled = !!busy; deny.disabled = !!busy;
-    actions.append(approve, edit, deny);
-    if (hasAdd) actions.append(el("span", { class: "hint", text: "Fill the highlighted parts with Edit first." }));
-    if (!ACCOUNTS[t.Client]) actions.append(el("span", { class: "hint", text: "This mailbox isn't connected for sending." }));
-    const ask = (msg, danger, go, label) => {
-      actions.querySelectorAll(".confirm").forEach(x => x.remove());
-      const yes = el("button", { type: "button", class: "btn " + (danger ? "danger" : "primary"), text: label });
-      const no = el("button", { type: "button", class: "btn", text: "Cancel" });
-      const c = el("div", { class: "confirm" + (danger ? " danger" : "") }, el("span", { text: msg }), yes, no);
-      yes.addEventListener("click", go, { once: true }); no.addEventListener("click", () => c.remove());
-      actions.append(c);
-    };
-    approve.addEventListener("click", () => ask(`Send to ${t["Draft to"]} from ${t.Mailbox}?`, false, () => act(t, "send", t["Draft reply"], t["Draft to"]), "Send now"));
-    deny.addEventListener("click", () => ask("Discard this draft? Nothing is sent.", true, () => act(t, "deny"), "Discard"));
-    edit.addEventListener("click", () => {
-      state.editing = t.Key;
-      const area = el("textarea", { class: "body", "aria-label": "Edit the reply" }); area.value = t["Draft reply"];
-      const to = el("input", { class: "toinput", type: "email", value: t["Draft to"], "aria-label": "Send to" });
-      const send = el("button", { type: "button", class: "btn primary", text: "Send edited reply" });
-      const cancel = el("button", { type: "button", class: "btn", text: "Cancel" });
-      const msg = el("span", { class: "hint" });
-      view.replaceWith(area);
-      actions.replaceChildren(el("span", { class: "label", text: "To" }), to, send, cancel, msg);
-      area.focus();
-      cancel.addEventListener("click", () => { state.editing = null; renderAll(); });
-      send.addEventListener("click", () => {
-        const text = area.value.trim(), addr = to.value.trim();
-        if (/\[ADD:/.test(text)) { msg.textContent = "Replace every [ADD: …] part first."; msg.className = "hint err"; return; }
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(addr)) { msg.textContent = "Enter one valid email address."; msg.className = "hint err"; return; }
-        ask(`Send your edited reply to ${addr} from ${t.Mailbox}?`, false, () => { state.editing = null; act(t, "send", text, addr); }, "Send now");
-      });
-    });
-    return li;
-  }
-
-  // ---------- sheet writes and sending (Claude page only)
-  const values = res => { const p = res && res.payload; return (p && p.values) || []; };
-  const sheetWrite = (range, vals) => state.mcp.callTool(SERVER, "update_values", { spreadsheetId: SHEET, range, values: vals }, { cache: false });
-  async function rowNow(t) {
-    const r = await state.mcp.callTool(SERVER, "get_values", { spreadsheetId: SHEET, range: `Threads!A${t.row}:AD${t.row}` }, { cache: false });
-    const v = values(r)[0] || [];
-    return { key: v[0] || "", status: v[27] || "" };
-  }
-  const firstResult = p => p && p.data && p.data.results && p.data.results[0];
-  async function act(t, kind, text, to) {
-    const key = t.Key; state.busy[key] = kind; state.notes[key] = null; renderAll();
-    const note = (msg, cls) => { state.notes[key] = { msg, cls }; };
-    try {
-      const live = await rowNow(t);
-      if (live.key !== t.Key) { note("The sheet changed since this loaded. Reload and try again.", "err"); return; }
-      if (live.status !== "Pending") { note(`Already marked "${live.status || "empty"}" in the sheet.`, "err"); t["Draft status"] = live.status; return; }
-      if (kind === "deny") { await sheetWrite(`Threads!${COL.status}${t.row}:${COL.at}${t.row}`, [["Denied", t["Draft to"], nowIST()]]); t["Draft status"] = "Denied"; note("Draft discarded.", "ok"); return; }
-      await sheetWrite(`Threads!${COL.status}${t.row}`, [["Sending"]]); t["Draft status"] = "Sending";
-      let result;
-      try {
-        result = await state.mcp.callTool(COMPOSIO, "COMPOSIO_MULTI_EXECUTE_TOOL", {
-          tools: [{ tool_slug: "GMAIL_REPLY_TO_THREAD", account: ACCOUNTS[t.Client], arguments: {
-            thread_id: t.Key.split("|").slice(1).join("|"), recipient_email: to, message_body: text, is_html: false, include_signature: false } }],
-          sync_response_to_workbench: false, current_step: "SEND_APPROVED_REPLY", thought: "Send a reply the outreach manager approved." }, { cache: false });
-      } catch (err) {
-        if (err && err.code === "tool_error") { await sheetWrite(`Threads!${COL.status}${t.row}`, [["Pending"]]); t["Draft status"] = "Pending"; note(`Not sent: ${err.message || "Composio refused the call"}.`, "err"); }
-        else note(`The send may or may not have gone through (${(err && err.code) || "no answer"}). Check Gmail before trying again.`, "err");
-        return;
-      }
-      const res = firstResult(result.payload);
-      if (!(res && res.response && res.response.successful === true)) {
-        await sheetWrite(`Threads!${COL.status}${t.row}`, [["Pending"]]); t["Draft status"] = "Pending";
-        note(`Not sent: ${String((res && res.response && res.response.error) || "Gmail refused the reply.").slice(0, 200)}`, "err"); return;
-      }
-      await sheetWrite(`Threads!${COL.reply}${t.row}:${COL.at}${t.row}`, [[text, "Sent", to, nowIST()]]);
-      Object.assign(t, { "Draft reply": text, "Draft status": "Sent", "Draft to": to });
-      note(`Sent to ${to} from ${t.Mailbox}.`, "ok");
-    } catch (err) {
-      note(errorText(err, "sheet"), "err");
-    } finally {
-      delete state.busy[key];
-      try { await state.mcp.invalidate(SERVER); } catch (e) {}
-      renderAll();
-    }
-  }
-
-  // ---------- renders
-  function renderNav() {
-    const nav = $("nav");
-    if (state.dash) $("updated").textContent = state.dash.updated ? `Updated ${state.dash.updated} IST` : "No report run yet";
-    nav.querySelectorAll(".navbtn.client").forEach(n => n.remove());
-    for (const n of names()) {
-      const row = state.dash && state.dash.clients.find(c => c.Client === n);
-      const cnt = drafts(n).length + needsReply(n).length;
-      nav.append(el("a", { href: "#" + slug(n), class: "navbtn client" },
-        el("span", { text: n }),
-        row && row["Refill needed?"] === "YES" && !cnt ? el("i", { class: "dot", title: "Needs a refill" }) : null,
-        el("b", { class: "count", text: cnt ? String(cnt) : "", title: "Replies to approve or answer" })));
-    }
-    const total = drafts().length + needsReply().length + refills().length;
-    $("count-home").textContent = total ? String(total) : "";
-    const here = "#" + (state.client ? slug(state.client) : "home");
-    for (const a of nav.querySelectorAll(".navbtn")) a.setAttribute("aria-current", a.getAttribute("href") === here ? "page" : "false");
-  }
-
-  function fillQueue(id, items, emptyText) {
-    const ul = $("ql-" + id); ul.replaceChildren();
-    $("qc-" + id).textContent = items === null ? "–" : String(items.length);
-    if (items === null) { ul.append(el("li", { class: "qempty", text: "Loading…" })); return; }
-    if (!items.length) { ul.append(el("li", { class: "qempty", text: emptyText })); return; }
-    items.forEach(i => ul.append(i));
-  }
-
-  function typeItem(t, showClient) {
-    return el("li", { class: "qitem" },
-      el("div", { class: "top" }, el("span", { class: "who", text: t["Company domain"] || "Unknown company" }),
-        showClient ? el("a", { class: "label", href: "#" + slug(t.Client), text: t.Client }) : el("span", { class: "num label", text: (t["Last reply at"] || "").slice(0, 10) })),
-      el("div", { class: "meta" }, stagePill(t.stage), t["Needs our reply"] === "Yes" ? el("span", { class: "pill bad", text: "Needs reply" }) : null),
-      t["Next action"] ? el("div", { class: "note", text: t["Next action"] }) : null);
-  }
-  function renderTypes(prefix, name) {
-    if (!state.threads) return;
-    const rank = t => (t["Needs our reply"] === "Yes" ? 0 : OPEN.includes(t.stage) ? 1 : 2);
-    for (const ty of TYPES) {
-      const list = replied(name).filter(t => t.type === ty)
-        .sort((a, b) => rank(a) - rank(b) || String(b["Last message at"]).localeCompare(String(a["Last message at"])));
-      $(`${prefix}-c-${ty}`).textContent = String(list.length);
-      const empty = { Exchange: "No exchange replies yet.", Paid: "Nobody has asked for payment.", Partnership: "No partnership proposals." }[ty];
-      $(`${prefix}-l-${ty}`).replaceChildren(...(list.length ? list.map(t => typeItem(t, !name)) : [el("li", { class: "qempty", text: empty })]));
-    }
-  }
-
-  function renderHome() {
-    const d = state.dash;
-    const box = $("cards");
-    if (d) { box.replaceChildren(...(d.clients.length ? d.clients.map(c => clientCard(c, true)) : [el("div", { class: "card empty", text: "No client rows yet." })])); }
-    renderTypes("home", "");
-    if (state.editing) return;
-    fillQueue("approve", state.threads ? drafts().map(draftItem) : null, "No replies waiting for approval.");
-    fillQueue("refill", d ? refills().map(c => el("li", { class: "qitem" },
-      el("div", { class: "top" }, el("a", { class: "who", href: "#" + slug(c.Client), text: c.Client })),
-      el("div", { class: "note", text: "Running low on companies to email. Run the top-of-funnel fill." }))) : null, "No client needs a refill.");
-    fillQueue("reply", state.threads ? needsReply().sort((a, b) => String(a["Last message at"]).localeCompare(String(b["Last message at"]))).map(t => el("li", { class: "qitem" },
-      el("div", { class: "top" }, el("span", { class: "who", text: t["Company domain"] || "Unknown company" }), el("span", { class: "label", text: t.Client })),
-      el("div", { class: "meta" }, stagePill(t.stage), " ", el("span", { class: "num", text: t["Last message at"] || "" })),
-      t["Next action"] ? el("div", { class: "note", text: t["Next action"] }) : null,
-      t["Gmail link"] && !READONLY ? el("a", { href: t["Gmail link"], target: "_blank", rel: "noopener", text: "Open in Gmail" }) : null)) : null, "No thread is waiting on us.");
-  }
-
-  function renderClient() {
-    if (!state.client) return;
-    $("client-name").textContent = state.client;
-    const d = state.dash, one = $("client-card");
-    if (d) { const mine = d.clients.find(c => c.Client === state.client); one.replaceChildren(mine ? clientCard(mine, false) : el("div", { class: "card empty", text: "No row in the latest report yet." })); }
-    renderSettings();
-    renderSections();
-    if (!state.editing && state.threads) {
-      const ul = $("client-drafts"); const list = drafts(state.client);
-      ul.replaceChildren(...(list.length ? list.map(draftItem) : [el("li", { class: "qempty", text: "No replies waiting for approval." })]));
-    }
-    renderTypes("client", state.client);
-    renderFills(); renderRuns(); renderExchanges(); renderThreads();
-  }
-
-  function renderSettings() {
-    if (!state.client || !state.settings || state.editingSettings) return;
-    const cfg = state.settings[state.client] || {};
-    $("f-positioning").value = cfg.positioning || "";
-    $("f-listicles").value = cfg.listicles || "";
-    const open = $("open-listicles");
-    open.hidden = !/^https?:\/\//.test(cfg.listicles || "");
-    if (!open.hidden) open.href = cfg.listicles;
-    $("settings-note").textContent = READONLY ? "" : cfg.at ? `Saved ${cfg.at}` : "Not saved yet";
-    $("settings-note").className = "hint";
-  }
-
-  function sectionPrefs() { return Object.assign(Object.fromEntries(SECTIONS.map(s => [s.id, s.on])), store.get("od-sections") || {}); }
-  function renderSections() {
-    const prefs = sectionPrefs();
-    for (const s of SECTIONS) { const sec = document.querySelector(`[data-sec="${s.id}"]`); if (sec) sec.hidden = !prefs[s.id]; }
-    const menu = $("picker-menu");
-    if (!menu.children.length) for (const s of SECTIONS) {
-      const box = el("input", { type: "checkbox", id: "sec-" + s.id });
-      box.checked = !!prefs[s.id];
-      box.addEventListener("change", () => { const p = sectionPrefs(); p[s.id] = box.checked; store.set("od-sections", p); renderSections(); });
-      menu.append(el("label", { for: "sec-" + s.id }, box, s.label));
-    }
-  }
-
-  function renderFills() {
-    const body = $("log-fills"); if (!state.fills) return;
-    const mine = state.fills.filter(r => r.Client === state.client).reverse();
-    body.replaceChildren(...(mine.length ? mine.map(r => el("tr", {},
-      el("td", { class: "when num", text: r.Date }), el("td", { text: r.Source || "Pool (AI visibility tool)" }),
-      el("td", { class: "num", text: r["Waiting at start"] }), el("td", { class: "num strong", text: r.Added }),
-      el("td", { class: "num", text: r["Left in pool"] }), el("td", { class: "quote", text: r.Message }))) : [el("tr", {}, el("td", { colspan: "6", class: "empty", text: "No funnel fills logged for this client yet." }))]));
-  }
-  function renderRuns() {
-    const body = $("log-runs"); if (!state.runs) return;
-    const mine = state.runs.filter(r => r.Client === state.client).reverse();
-    body.replaceChildren(...(mine.length ? mine.map(r => el("tr", {}, el("td", { class: "when num", text: r["Run at"] }), el("td", { text: r.Sequence }),
-      ...["Bank companies", "Bank people", "Pool companies", "Scheduled", "Sent total", "Replies total", "Open threads", "Needs our reply", "Agreed", "Backlinks"].map(k => el("td", { class: "num", text: r[k] })))) :
-      [el("tr", {}, el("td", { colspan: "12", class: "empty", text: "No report runs logged yet." }))]));
-  }
-  function renderExchanges() {
-    const body = $("exchanges"); if (!state.threads) return;
-    const has = t => ["URL we gave them", "URL they gave us", "Blurb they sent us", "Blurb we sent them", "Backlink URL"].some(k => String(t[k] || "").trim());
-    const list = state.threads.filter(t => t.Client === state.client && has(t));
-    const link = (url, date) => {
-      if (!url) return el("td", { text: "–" });
-      return el("td", { class: "url" }, el("a", { href: /^https?:\/\//.test(url) ? url : "https://" + url, target: "_blank", rel: "noopener", text: url }), date ? el("small", { text: `on ${date}` }) : null);
-    };
-    const blurb = (label, text, date) => text ? el("details", { class: "blurb" }, el("summary", { text: `${label}${date ? " · " + date : ""}` }), el("p", { text })) : null;
-    body.replaceChildren(...(list.length ? list.map(t => {
-      const b = el("td", {}, blurb("They sent us", t["Blurb they sent us"], t["Date of their blurb"]), blurb("We sent them", t["Blurb we sent them"], t["Date of our blurb"]));
-      if (!b.childNodes.length) b.textContent = "–";
-      return el("tr", {}, el("td", { class: "strong", text: t["Company domain"] || "–" }), el("td", {}, stagePill(t.stage)),
-        link(t["URL they gave us"], t["Date they gave it"]), link(t["URL we gave them"], t["Date we gave it"]), b, link(t["Backlink URL"], ""));
-    }) : [el("tr", {}, el("td", { colspan: "6", class: "empty", text: "No agreed URLs or blurbs recorded yet." }))]));
-  }
-  function renderThreads() {
-    const body = $("threads"); if (!state.threads) return;
-    let list = state.threads.filter(t => t.Client === state.client);
-    if (state.filter === "needs") list = list.filter(t => t["Needs our reply"] === "Yes");
-    else if (state.filter === "open") list = list.filter(t => OPEN.includes(t.stage));
-    else if (state.filter === "links") list = list.filter(t => t.stage === "Link live");
-    list.sort((a, b) => String(b["Last message at"]).localeCompare(String(a["Last message at"])));
-    body.replaceChildren(...(list.length ? list.map(t => el("tr", {},
-      el("td", { class: "strong" }, t["Company domain"] || "–", el("small", { text: t.Contact || "" })),
-      el("td", {}, stagePill(t.stage)), el("td", { text: t["Last message from"] || "–" }), el("td", { class: "when num", text: t["Last message at"] || "–" }),
-      el("td", { class: "quote", text: t["Latest from them"] || "" }), el("td", { text: t["Next action"] || "" }),
-      el("td", {}, t["Gmail link"] && !READONLY ? el("a", { href: t["Gmail link"], target: "_blank", rel: "noopener", text: "Open" }) : null))) :
-      [el("tr", {}, el("td", { colspan: "7", class: "empty", text: "Nothing here." }))]));
-  }
-  for (const b of document.querySelectorAll(".tabs button")) b.addEventListener("click", () => {
-    state.filter = b.dataset.f;
-    document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
-    renderThreads();
-  });
-
-  function renderAll() { renderNav(); if (state.client) renderClient(); else renderHome(); }
-
-  // ---------- settings save (Claude page only)
-  if (READONLY) { $("f-positioning").readOnly = true; $("f-listicles").readOnly = true; $("save-settings").hidden = true; }
-  for (const id of ["f-positioning", "f-listicles"]) $(id).addEventListener("input", () => { state.editingSettings = true; });
-  $("settings").addEventListener("submit", async e => {
-    e.preventDefault();
-    if (READONLY) return;
-    const note = $("settings-note");
-    if (!state.mcp || !state.settings) { note.textContent = "The sheet isn't loaded yet."; note.className = "hint err"; return; }
-    const link = $("f-listicles").value.trim();
-    if (link && !/^https?:\/\//.test(link)) { note.textContent = "The link must start with https://"; note.className = "hint err"; return; }
-    const cfg = state.settings[state.client], row = cfg ? cfg.row : state.settings._next, at = nowIST(), pos = $("f-positioning").value.trim();
-    $("save-settings").disabled = true; note.textContent = "Saving…"; note.className = "hint";
-    try {
-      await sheetWrite(`Clients!A${row}:D${row}`, [[state.client, pos, link, at]]);
-      state.settings[state.client] = { row, positioning: pos, listicles: link, at };
-      if (!cfg) state.settings._next = row + 1;
-      state.editingSettings = false; renderSettings();
-      note.textContent = `Saved ${at}. Drafts use it from the next report run.`; note.className = "hint ok";
-      try { await state.mcp.invalidate(SERVER); } catch (err) {}
-    } catch (err) { note.textContent = errorText(err, "client settings"); note.className = "hint err"; }
-    finally { $("save-settings").disabled = false; }
-  });
-
-  // ---------- routing
-  function route() {
-    const h = (location.hash || "#home").slice(1);
-    const found = names().find(n => slug(n) === h) || "";
-    state.client = found; state.editingSettings = false; state.editing = null;
-    $("view-home").hidden = !!found; $("view-client").hidden = !found;
-    document.title = found ? `${found} · Outreach Desk` : "Outreach Desk";
-    $("picker").open = false;
-    renderAll(); window.scrollTo(0, 0);
-  }
-  window.addEventListener("hashchange", route);
-  document.addEventListener("click", e => { const p = $("picker"); if (p.open && !p.contains(e.target)) p.open = false; });
-  route();
-
-  // ---------- data
-  const TABS = [
-    { id: "dash", tab: "Dashboard", range: "Dashboard!A1:Q60", gid: 1703437801, take: v => { state.dash = parseDash(v); } },
-    { id: "threads", tab: "Threads", range: "Threads!A1:AE3000", gid: 1717218297, take: v => { state.threads = parseThreads(v); } },
-    { id: "clients", tab: "Clients", range: "Clients!A1:D50", gid: 33657286, take: v => { state.settings = parseSettings(v); } },
-    { id: "runs", tab: "Dashboard runs", range: "Dashboard runs!A1:M3000", gid: 1286745943, take: v => { state.runs = rowsOf(v); } },
-    { id: "fills", tab: "Status", range: "Status!A1:G2000", gid: 799832616, take: v => { state.fills = rowsOf(v); } },
-  ];
-  const parseCSV = text => {
-    const rows = []; let row = [], cell = "", q = false;
-    for (let i = 0; i < text.length; i++) {
-      const c = text[i];
-      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
-      else if (c === '"') q = true; else if (c === ",") { row.push(cell); cell = ""; }
-      else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; } else if (c !== "\r") cell += c;
-    }
-    if (cell || row.length) { row.push(cell); rows.push(row); }
-    return rows;
+  // Source logos: the tool's own site icon.
+  const SRC_SITE = { "maxvisibility": "maximuslabs.ai", "max visibility": "maximuslabs.ai", "peec": "peec.ai", "peec ai": "peec.ai",
+    "athena hq": "athenahq.ai", "athenahq": "athenahq.ai", "triple whale backlinks": "triplewhale.com", "triple whale": "triplewhale.com",
+    "profound": "tryprofound.com", "ahrefs": "ahrefs.com", "semrush": "semrush.com" };
+  const srcLabel = name => {
+    const site = SRC_SITE[String(name || "").toLowerCase().trim()];
+    const logo = site ? el("img", { class: "logo", src: `https://www.google.com/s2/favicons?domain=${site}&sz=64`, alt: "", width: "16", height: "16", loading: "lazy" })
+      : el("span", { class: "logo none", "aria-hidden": "true", text: "✎" });
+    return el("span", {}, logo, name);
   };
 
-  if (PUBLISHED) {                                   // GitHub copy: the sheet's "Publish to web" CSVs
-    const load = async () => {
-      const failed = [];
-      await Promise.all(TABS.map(async t => {
-        try {
-          await window.whenAuthed;
-          const { data, error } = await SB.from("sheet_tabs").select("rows").eq("tab", t.tab).maybeSingle();
-          if (error || !data) throw new Error(error ? error.message : "empty");
-          t.take(data.rows);
-        } catch (e) { failed.push(t.id); }
-      }));
-      showBanner(failed.length === TABS.length ? "No report data in the database yet, or this login is not allowed." :
-        failed.length ? `Some parts couldn't load (${failed.join(", ")}). They try again in 5 minutes.` : "", failed.length > 0);
-      renderAll();
-    };
-    load(); setInterval(load, 60 * 1000);
-    return;
-  }
-  if (READONLY) { showBanner("This page isn't connected to the report sheet yet.", true); return; }
+  function homeOutcomes() { $("home-out").replaceChildren(); }   // replies live in the graph and on each card now
 
-  (async () => {                                     // Claude page: the viewer's Google Sheets connector
-    const mcp = window.claude ? await window.claude.use("mcp") : null;
-    state.mcp = mcp;
-    if (!mcp) { showBanner("Open this page in claude.ai with the Google Sheets connector to load the report.", false); return; }
-    const errs = {};
-    const DENY = ["needs_reauth", "server_not_connected", "blocked_by_policy", "approval_required", "not_in_manifest", "consent_required"];
-    const report = () => {
-      const e = Object.values(errs).filter(Boolean);
-      showBanner(!e.length ? "" : e.every(x => x.code === e[0].code) ? errorText(e[0], "report") : e.map(x => x.text).join(" "), !!e.length);
+  // Show the first five rows of a table; the rest scroll up and down under a fixed header.
+  const fiveRows = w => requestAnimationFrame(() => {
+    const rs = [...w.querySelectorAll("tbody tr")], h = w.querySelector("thead");
+    w.style.maxHeight = rs.length > 5 ? (h.offsetHeight + rs.slice(0, 5).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px" : "";
+  });
+
+  function homeQueue(d) {
+    const cs = d.clients.filter(c => !c.placeholder);
+    $("home-queue").replaceChildren(el("div", { class: "queue" },
+      el("div", { class: "queue-head" }, el("h3", { text: "Emails scheduled" }), el("span", { text: "Companies in each sequence not emailed yet · refill when below 20" })),
+      el("div", { class: "queue-grid" }, ...cs.map(c => {
+        const v = c.queued_cos, low = typeof v === "number" && v < 20;
+        return el("a", { class: "q" + (low ? " low" : ""), href: "monitor.html?c=" + c.slug }, c.name,
+          el("b", { text: v == null ? "–" : String(v) }),
+          el("small", { text: `companies · ${c.queued_people == null ? "–" : c.queued_people} people waiting` + (low ? " · refill" : "") }));
+      }))));
+  }
+
+  function nav(d) {
+    const box = $("nav");
+    for (const c of d.clients) box.append(el("a", { href: "monitor.html?c=" + c.slug, class: "navbtn", "aria-current": MODE === "client" && c.slug === SLUG ? "page" : null },
+      el("span", { text: c.name }), c.placeholder ? null : el("b", { class: "count" + (c.needs_reply ? "" : " zero"), title: "Needs our reply", text: String(c.needs_reply || 0) })));
+    if (MODE === "team") $("nav-home").setAttribute("aria-current", "page");
+  }
+
+
+  const MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const todayIST = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+  const pretty = d => { const [y, m, dd] = d.split("-").map(Number); const w = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }); return `${w} ${dd} ${MON[m - 1].slice(0, 3)}`; };
+  // Only the numbers above zero; nothing at all reads "no activity".
+  // ↗ sent · ↙ replies; only numbers above zero, "no activity" when both are zero.
+  const pair = (s, r, f = 0, words = false) => {
+    const parts = [[s, "s", "↗", "sent"], [r, "r", "↙", "replies"]].filter(x => x[0]);
+    return parts.length ? parts.flatMap(([v, c, sym, w], i) => [i ? "  " : null, el("b", { class: c, text: `${sym} ${v}${words ? " " + w : ""}` })])
+      : [el("span", { text: "no activity" })];
+  };
+  const counts = (s, r) => [s ? el("span", { class: "s", text: "↗" + s }) : null, r ? el("span", { class: "r", text: "↙" + r }) : null];
+
+  // days: {"YYYY-MM-DD": [sent, replies]}; onPick(day) is called on load (today) and on each click.
+  function calendar(box, days, onPick) {
+    const today = todayIST();
+    let ym = today.slice(0, 7), sel = today;
+    const draw = () => {
+      const [y, m] = ym.split("-").map(Number);
+      const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), n = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const prev = el("button", { type: "button", "aria-label": "Previous month", text: "‹" }), next = el("button", { type: "button", "aria-label": "Next month", text: "›" });
+      prev.onclick = () => { const d = new Date(Date.UTC(y, m - 2, 1)); ym = d.toISOString().slice(0, 7); draw(); };
+      next.onclick = () => { const d = new Date(Date.UTC(y, m, 1)); ym = d.toISOString().slice(0, 7); draw(); };
+      if (ym >= today.slice(0, 7)) next.disabled = true;
+      const grid = el("div", { class: "cal-grid" }, ...["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(w => el("div", { class: "cal-wd", text: w })));
+      for (let i = 0; i < first; i++) grid.append(el("div", { class: "cal-day blank" }));
+      let ms = 0, mr = 0, mf = 0;
+      for (let dd = 1; dd <= n; dd++) {
+        const day = `${ym}-${String(dd).padStart(2, "0")}`, [s, r, f = 0] = days[day] || [0, 0, 0], fut = day > today;
+        ms += s; mr += r; mf += f;
+        const b = el("button", { type: "button", class: "cal-day" + (day === today ? " today" : "") + (day === sel ? " sel" : "") + (fut ? " future" : ""),
+          "aria-label": `${pretty(day)}: ${s} sent, ${r} replies` }, el("span", { class: "n", text: String(dd) }), el("span", { class: "c" }, ...(fut ? [] : counts(s, r))));
+        if (fut) b.disabled = true; else b.onclick = () => { sel = day; draw(); onPick(day); };
+        grid.append(b);
+      }
+      const [ss, sr, sf = 0] = days[sel] || [0, 0, 0];
+      box.replaceChildren(el("div", { class: "cal" },
+        el("div", { class: "cal-head" }, el("h3", { text: `${MON[m - 1]} ${y}` }), el("span", {}, prev, " ", next)),
+        grid,
+        el("div", { class: "cal-foot" },
+          el("span", {}, pretty(sel) + ": ", ...pair(ss, sr, sf, true)),
+          el("span", {}, "This month: ", ...pair(ms, mr, mf, true)))));
     };
-    const fail = (t, err) => { errs[t.id] = { code: err && err.code, text: errorText(err, t.id) }; if (DENY.includes(err && err.code)) t.take([]); };
-    const opts = { cache: { staleTime: 60 * 1000, gcTime: 6 * 60 * 60 * 1000 } };
-    for (const t of TABS) {
-      try { t.take(values(await mcp.callTool(SERVER, "get_values", { spreadsheetId: SHEET, range: t.range }, opts))); errs[t.id] = null; }
-      catch (err) { fail(t, err); }
+    draw(); onPick(sel);
+  }
+
+
+  // ---------- performance chart (Search Console style) ----------
+  // trend: {"YYYY-MM-DD": [emails sent, new companies, companies replied, exchanges live]}
+  const METRICS = [
+    { label: "Emails sent", color: "#3d8ff0" },
+    { label: "New companies reached", color: "#9b7bf0" },
+    { label: "Replies (companies)", color: "#1fa067" },
+    { label: "New exchanges", color: "#d95aa0" },
+  ];
+  const RANGES = [["7d", "7 days", 7], ["28d", "28 days", 28], ["3m", "3 months", 90], ["all", "All", 0]];
+  const GROUPS = [["day", "Day"], ["week", "Week"], ["month", "Month"]];
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const sv = (tag, attrs = {}) => { const n = document.createElementNS(SVGNS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+  const addDays = (d, k) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + k); return t.toISOString().slice(0, 10); };
+  const short = d => { const [, m, dd] = d.split("-").map(Number); return `${dd} ${MON[m - 1].slice(0, 3)}`; };
+  const bucketOf = (d, g) => {
+    if (g === "month") return d.slice(0, 7) + "-01";
+    if (g === "week") { const w = new Date(d + "T00:00:00Z").getUTCDay(); return addDays(d, -((w + 6) % 7)); }
+    return d;
+  };
+  const bucketLabel = (k, g) => g === "month" ? `${MON[Number(k.slice(5, 7)) - 1]} ${k.slice(0, 4)}` : g === "week" ? `Week of ${short(k)}` : pretty(k);
+  const niceMax = v => { const s = v / 4; if (s <= 1) return 4; const p = Math.pow(10, Math.floor(Math.log10(s))); for (const m of [1, 2, 5, 10]) if (m * p >= s) return 4 * m * p; return 4 * s; };
+
+  // Until a report has written `trend`, build it from the calendar days and the completed exchanges.
+  const trendOf = c => {
+    if (c.trend) return c.trend;
+    const t = {};
+    for (const [d, [s, r, f = 0]] of Object.entries(c.days || {})) t[d] = [s + f, 0, r, 0];
+    for (const x of c.exchanges || []) { const d = (x.live || "").slice(0, 10); if (d) (t[d] || (t[d] = [0, 0, 0, 0]))[3] += 1; }
+    return t;
+  };
+
+  // Reply outcomes: what each company's reply means for an exchange.
+  const OUT = [["accepted", "Accepted", "#1fa067"], ["progress", "In progress", "#c8841f"], ["dropped", "Not going ahead", "#7a7a84"]];
+  const outBar = (o, h = 10) => { const t = OUT.reduce((a, [k]) => a + ((o || {})[k] || 0), 0) || 1;
+    return el("div", { class: "obar", style: `height:${h}px`, role: "img", "aria-label": OUT.map(([k, l]) => `${l} ${(o || {})[k] || 0}`).join(", ") },
+      ...OUT.map(([k, , c]) => (o || {})[k] ? el("i", { style: `width:${o[k] / t * 100}%;background:${c}` }) : null)); };
+
+  // What happened with each reply, one colour per kind (cards and Home share these).
+  const CATS = [["live", "Live", "#1fa067"], ["agreed", "Agreed, not live yet", "#93dcb4"], ["talks", "In talks", "#e8962e"],
+    ["paid", "Paid placement", "#e6c53f"], ["bar", "Below their DR/DA bar", "#2bb3c0"], ["declined", "Declined / not a fit", "#ececee"],
+    ["away", "Out of office", "#050506"]];
+  const catOf = r => { const [g, w] = r.split(":");
+    return g === "progress" ? "talks" : g === "none" ? "away" : w === "Paid only" ? "paid" : w === "Below their DR/DA bar" ? "bar" : "declined"; };
+  // Counts per kind, plus the reasons inside each. Companies with only an out-of-office come from the outcome summary,
+  // or, on data written before it counted them, from the "Others" list.
+  const breakdown = (o, c) => {
+    const n = Object.fromEntries(CATS.map(([k]) => [k, 0])), why = Object.fromEntries(CATS.map(([k]) => [k, {}]));
+    if (!o) return { n, why };
+    n.live = o.live || 0; n.agreed = (o.accepted || 0) - (o.live || 0);
+    for (const [r, v] of Object.entries(o.reasons || {})) { const k = catOf(r), w = r.split(":")[1]; n[k] += v; why[k][w] = (why[k][w] || 0) + v; }
+    const talks = (o.progress || 0) - Object.entries(o.reasons || {}).filter(([r]) => r.startsWith("progress:")).reduce((a, [, v]) => a + v, 0);
+    if (talks > 0) { n.talks += talks; why.talks.Talking = (why.talks.Talking || 0) + talks; }
+    if (o.none == null && c) {
+      const busy = new Set([...(c.list_reply || []), ...(c.list_waiting || []), ...(c.list_paid || []), ...(c.exchanges || []).map(x => ({ company: x.partner }))].map(x => x.company));
+      const away = new Set((c.list_others || []).filter(x => /out of office|bounced/i.test(x.reason || x.stage || "")).map(x => x.company)
+        .filter(co => !busy.has(co) && !(c.list_others || []).some(y => y.company === co && !/out of office|bounced/i.test(y.reason || y.stage || ""))));
+      n.away = away.size; if (away.size) why.away["Out of office"] = away.size;
     }
-    report(); renderAll();
-    for (const t of TABS) mcp.watchTool(SERVER, "get_values", { spreadsheetId: SHEET, range: t.range }, ev => {
-      if (ev.type === "data") { errs[t.id] = null; t.take(values(ev.result)); } else fail(t, ev.error);
-      report(); renderAll();
-    }, Object.assign({ refetchInterval: 5 * 60 * 1000 }, opts));
-  })();
+    return { n, why };
+  };
+  const catBar = (n, keys, h = 10) => { const t = keys.reduce((a, k) => a + (n[k] || 0), 0) || 1;
+    return el("div", { class: "obar cbar", style: `height:${h}px`, role: "img", "aria-label": CATS.filter(([k]) => keys.includes(k)).map(([k, l]) => `${l} ${n[k] || 0}`).join(", ") },
+      ...CATS.filter(([k]) => keys.includes(k) && n[k]).map(([k, l, col]) => el("i", { title: `${l} ${n[k]}`, class: k === "away" ? "away" : null, style: `width:${n[k] / t * 100}%;background:${col}` }))); };
+  const ALL = CATS.map(([k]) => k);
+  // Three groups of replies (live exchanges are counted on their own).
+  const G3 = [["pos", "Interested", "#1fa067", ["agreed", "talks"]], ["neg", "Not interested", "#e0525f", ["paid", "bar", "declined"]], ["hold", "On hold", "#8a8a94", ["away"]]];
+  const G3OF = Object.fromEntries(G3.flatMap(([g, , , ks]) => ks.map(k => [k, g])));
+  const g3n = n => Object.fromEntries(G3.map(([g, , , ks]) => [g, ks.reduce((a, k) => a + (n[k] || 0), 0)]));
+  const g3why = n => Object.fromEntries(G3.map(([g, , , ks]) => [g, ks.filter(k => n[k]).map(k => `${CATS.find(c => c[0] === k)[1]} ${n[k]}`).join(" · ")]));
+  const g3Bar = (n, h = 4) => { const t = G3.reduce((a, [g]) => a + n[g], 0) || 1;
+    return el("div", { class: "obar cbar", style: `height:${h}px`, role: "img", "aria-label": G3.map(([g, l]) => `${l} ${n[g]}`).join(", ") },
+      ...G3.filter(([g]) => n[g]).map(([g, l, col]) => el("i", { title: `${l} ${n[g]}`, style: `width:${n[g] / t * 100}%;background:${col}` }))); };
+  // Where one company's conversation stands, from the card lists (the best of its threads wins).
+  const coCat = c => { const best = {}, why = {}, rank = k => ALL.indexOf(k);
+    const put = (co, k, r) => { if (co && (best[co] == null || rank(k) < rank(best[co]))) { best[co] = k; why[co] = r || ""; } };
+    for (const x of c.exchanges || []) put(x.partner, "live");
+    for (const x of [...(c.list_reply || []), ...(c.list_waiting || []), ...(c.list_paid || []), ...(c.list_others || [])]) {
+      const w = `${x.reason || ""} ${x.stage || ""}`;
+      put(x.company, x.stage === "Link live" ? "live" : x.stage === "Agreed, awaiting link" ? "agreed" : /paid only|wants payment/i.test(w) || x.type === "Paid" ? "paid"
+        : /DR\/DA/i.test(w) ? "bar" : /out of office|bounced/i.test(w) ? "away" : /declined|not a fit/i.test(w) ? "declined" : "talks", x.reason);
+    }
+    const f = co => best[co] || "talks"; f.why = co => why[co] || ""; return f; };
+
+  function perf(box, trend, outs) {   // outs: [{outcomes, client}] for the Replies box when the data has no per-day kinds
+    const today = todayIST();
+    const keys = Object.keys(trend || {}).sort();
+    let range = "28d", group = "day", on = [true, false, false, false], rf = "all";   // rf: which replies the Replies line counts
+    const segOf = (opts, cur, set) => el("div", { class: "seg", role: "tablist" }, ...opts.map(([k, lab]) => {
+      const b = el("button", { type: "button", role: "tab", "aria-selected": String(k === cur), text: lab });
+      b.onclick = () => { set(k); draw(); }; return b;
+    }));
+    const kinds = keys.some(k => (trend[k] || []).length > 7);   // 7 kinds of reply, or the older 3 groups
+    const RCOL = kinds ? Object.fromEntries(ALL.map((k, i) => [k, 7 + i])) : { accepted: 4, progress: 5, dropped: 6 };
+    const RCH = kinds ? CATS : OUT;
+    const draw = () => {
+      const days = (RANGES.find(r => r[0] === range) || RANGES[1])[2];
+      const start = days ? addDays(today, -(days - 1)) : (keys[0] && keys[0] < today ? keys[0] : addDays(today, -6));
+      const buckets = new Map();
+      const NC = 7 + ALL.length;   // every column of the data: the 4 metrics, then the reply groups and kinds
+      for (let d = start; d <= today; d = addDays(d, 1)) { const k = bucketOf(d, group); if (!buckets.has(k)) buckets.set(k, Array(NC).fill(0)); }
+      const totals = Array(NC).fill(0);
+      for (const d of keys) {
+        if (d < start || d > today) continue;
+        const v = trend[d] || [], b = buckets.get(bucketOf(d, group));
+        const val = i => i === 2 && rf !== "all" ? (v[RCOL[rf]] || 0) : (v[i] || 0);
+        for (let i = 0; i < NC; i++) { b[i] += val(i); totals[i] += val(i); }
+      }
+      const pts = [...buckets.entries()];
+      const split = keys.some(k => (trend[k] || []).length > 4);
+      const lineCol = c => c === "#050506" ? "#6b6b74" : c;   // the black of "Out of office" would vanish on the dark chart
+      const ser = METRICS.map((m, i) => ({ col: i, color: m.color, label: m.label, scale: i })).filter((x, i) => on[i]);
+      const tileCol = i => METRICS[i].color;
+      // Replies box: Interested / Not interested / On hold, for the chosen range when the data has per-day kinds, else all time
+      let gn, gw, allTime = false;
+      if (kinds) { const kn = Object.fromEntries(ALL.map((k, j) => [k, totals[7 + j] || 0])); gn = g3n(kn); gw = g3why(kn); }
+      else if (outs && outs.length) { const kn = {}; for (const o of outs) { const b = breakdown(o.outcomes, o.client); for (const k of ALL) kn[k] = (kn[k] || 0) + b.n[k]; }
+        gn = g3n(kn); gw = g3why(kn); allTime = true; }
+      const g3row = gn ? el("span", { class: "tg3", title: allTime ? "All time" : "" }, ...G3.map(([g, l, col]) => el("span", { title: gw[g] || l }, el("i", { style: `background:${col}` }), `${l} `, el("b", { text: String(gn[g]) })))) : null;
+      const tiles = el("div", { class: "tiles" }, ...METRICS.map((m, i) => {
+        const t = el("button", { type: "button", class: "tile", "aria-pressed": String(on[i]), style: `--tc:${tileCol(i)}` },
+          el("span", { class: "tl" }, el("span", { class: "box", text: on[i] ? "✓" : "" }), m.label),
+          el("span", { class: "tv", text: totals[i].toLocaleString("en-IN") }), i === 2 ? g3row : null);
+        t.onclick = () => { on[i] = !on[i]; if (!on.some(Boolean)) on[i] = true; draw(); }; return t;
+      }));
+      const plot = el("div", { class: "plot" });
+      const card = el("div", { class: "perf" },
+        el("div", { class: "perf-head" }, el("h3", { text: "Performance" }),
+          el("div", { class: "perf-ctl" }, segOf(RANGES.map(r => [r[0], r[1]]), range, k => range = k), segOf(GROUPS, group, k => group = k))),
+        tiles,
+        plot,
+        el("div", { class: "perf-foot", text: "Companies and replies count each company once, on the first day it was emailed or replied. With more than one metric on, each line has its own scale." }));
+      box.replaceChildren(card);
+      chart(plot, pts, ser);
+    };
+    const chart = (plot, pts, ser) => {
+      const W = Math.max(plot.clientWidth || 600, 280), H = 250, single = new Set(ser.map(s => s.scale)).size === 1;
+      const L = single ? 34 : 8, R = 10, T = 10, B = 26, iw = W - L - R, ih = H - T - B, n = pts.length;
+      const x = i => L + (n === 1 ? iw / 2 : (i * iw) / (n - 1));
+      const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Performance chart" });
+      const top = {}; for (const s of ser) top[s.scale] = Math.max(top[s.scale] || 0, ...pts.map(p => p[1][s.col]));   // reply kinds share one scale
+      const max = ser.map(s => niceMax(top[s.scale]));
+      for (let g = 0; g <= 4; g++) {
+        const y = T + ih - (g * ih) / 4;
+        svg.append(sv("line", { x1: L, x2: W - R, y1: y, y2: y, class: g ? "grid" : "base" }));
+        if (single) { const t = sv("text", { x: L - 8, y: y + 3.5, "text-anchor": "end", class: "ax" }); t.textContent = String(Math.round((max[0] * g) / 4)); svg.append(t); }
+      }
+      const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / 70))));
+      pts.forEach(([k], i) => {
+        if (i !== n - 1 && (i % step || n - 1 - i < step * 0.7)) return;
+        const t = sv("text", { x: x(i), y: H - 8, "text-anchor": n === 1 ? "middle" : i === 0 ? "start" : i === n - 1 ? "end" : "middle", class: "ax" });
+        t.textContent = group === "month" ? `${MON[Number(k.slice(5, 7)) - 1].slice(0, 3)} ${k.slice(2, 4)}` : short(k); svg.append(t);
+      });
+      ser.forEach((s, j) => {
+        const y = v => T + ih - (v / max[j]) * ih;
+        const d = pts.map((p, q) => `${q ? "L" : "M"}${x(q).toFixed(1)},${y(p[1][s.col]).toFixed(1)}`).join(" ");
+        svg.append(sv("path", { d, class: "ln", stroke: s.color }));
+        if (n <= 14) pts.forEach((p, q) => svg.append(sv("circle", { cx: x(q), cy: y(p[1][s.col]), r: 3, fill: s.color, stroke: "var(--surface)", "stroke-width": 2 })));
+      });
+      const xh = sv("line", { y1: T, y2: T + ih, class: "xh", visibility: "hidden" }); svg.append(xh);
+      const dots = ser.map(s => { const c = sv("circle", { r: 4.5, fill: s.color, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }); svg.append(c); return c; });
+      const hit = sv("rect", { x: L, y: T, width: iw, height: ih, fill: "transparent" }); svg.append(hit);
+      const tip = el("div", { class: "tip", hidden: "" });
+      const move = ev => {
+        const r = svg.getBoundingClientRect(), px = ((ev.clientX - r.left) / r.width) * W;
+        const q = n === 1 ? 0 : Math.max(0, Math.min(n - 1, Math.round(((px - L) / iw) * (n - 1))));
+        const [k, v] = pts[q], cx = x(q);
+        xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.setAttribute("visibility", "visible");
+        ser.forEach((s, j) => { dots[j].setAttribute("cx", cx); dots[j].setAttribute("cy", T + ih - (v[s.col] / max[j]) * ih); dots[j].setAttribute("visibility", "visible"); });
+        tip.replaceChildren(el("b", { text: bucketLabel(k, group) }), ...ser.map(s => el("div", {}, el("i", { style: `background:${s.color}` }), s.label, el("span", { text: String(v[s.col]) }))));
+        tip.hidden = false;
+        const left = (cx / W) * r.width, tw = tip.offsetWidth;
+        tip.style.left = Math.max(0, Math.min(r.width - tw, left + (left > r.width / 2 ? -tw - 12 : 12))) + "px";
+      };
+      hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+      hit.addEventListener("pointerleave", () => { tip.hidden = true; xh.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); });
+      plot.replaceChildren(svg, tip);
+    };
+    draw();
+    let w0 = box.clientWidth;
+    new ResizeObserver(() => { if (Math.abs(box.clientWidth - w0) > 4) { w0 = box.clientWidth; draw(); } }).observe(box);
+  }
+
+  function homeDay(d, day) {
+    const per = d.clients.map(c => [c.name, ...((c.days || {})[day] || [0, 0, 0])]);
+    const ts = per.reduce((a, x) => a + x[1], 0), tr = per.reduce((a, x) => a + x[2], 0), tf = per.reduce((a, x) => a + (x[3] || 0), 0);
+    const big = [[ts, "s", "↗", "sent"], [tr, "r", "↙", "replies"]].filter(x => x[0]);
+    $("home-day").replaceChildren(el("h3", { text: `${pretty(day)} · all clients` }),
+      el("div", { class: "big" }, ...(big.length ? big.map(([v, c, sym, w]) => el("span", { class: c }, sym + v, el("small", { text: w })))
+        : [el("span", { class: "ph", text: "No emails this day" })])),
+      el("ul", {}, ...per.map(([name, s, r, f = 0]) => el("li", {}, el("span", { text: name }),
+        el("span", {}, ...(s || r ? counts(s, r).filter(Boolean).map(x => { x.style.fontWeight = 600; return x; }) : [el("b", { class: "ph", text: "–" })]))))));
+  }
+
+  function renderTeam(d) {
+    $("cards").replaceChildren(...d.clients.map(c => card(c, "monitor.html?c=" + c.slug)));
+    const all = {};
+    for (const c of d.clients) for (const [day, [s, r, f = 0]] of Object.entries(c.days || {})) { const a = all[day] || (all[day] = [0, 0, 0]); a[0] += s; a[1] += r; a[2] += f; }
+    calendar($("home-cal"), all, day => homeDay(d, day));
+    homeQueue(d);
+    homeOutcomes(d);
+    const tot = {};
+    for (const c of d.clients) for (const [day, v] of Object.entries(trendOf(c))) { const a = tot[day] || (tot[day] = [0, 0, 0, 0]); v.forEach((x, i) => a[i] = (a[i] || 0) + (x || 0)); }
+    perf($("home-perf"), tot, d.clients.filter(c => c.outcomes).map(c => ({ outcomes: c.outcomes, client: c })));
+    $("view-home").hidden = false;
+  }
+
+  const day = s => s ? s.slice(0, 10) : "–";
+  const DR = {"aimers.io": 50, "airmeet.com": 78, "albato.com": 73, "ampup.ai": 29, "asanify.com": 55, "atlashxm.com": 55, "citant.ai": 29, "cleverly.co": 64, "clixiemedia.com": 18, "coldreach.ai": 43, "concurate.com": 43, "conjura.com": 50, "coworker.ai": 60, "cuoral.com": 7, "discoveredlabs.com": 66, "dreamcast.co": 53, "dupple.com": 59, "elearningsolutionslab.com": 33, "emergent.sh": 86, "equinetacademy.com": 50, "eventify.io": 69, "flexhire.com": 10, "getmaxiq.com": 46, "gloroots.com": 40, "goairspeed.com": 52, "grouglobal.com": 32, "group.app": 64, "guideflow.com": 65, "heystream.com": 44, "improvado.io": 77, "inflopartners.com": 28, "intervue.io": 43, "kanerika.com": 65, "leadjourney.io": 35, "lebesgue.io": 66, "meetyoo.com": 62, "mercans.com": 49, "mindtickle.com": 74, "ness.com": 71, "omnihr.co": 56, "omnivoo.com": 21, "onestream.live": 72, "oysterhr.com": 72, "pickaxeproject.com": 61, "playroll.com": 60, "proprofs.com": 80, "reverbico.com": 70, "revspire.io": 39, "ruzuku.com": 72, "salesforge.ai": 72, "saleshandy.com": 76, "searcheye.io": 41, "shorpay.com": 40, "sparkup.app": 49, "syncgtm.com": 55, "teamed.global": 57, "thimpress.com": 87, "twominutereports.com": 63, "txtcart.ai": 65, "velaris.io": 51, "viasocket.com": 76, "wbcomdesigns.com": 79, "webinarninja.com": 75, "zapier.com": 92};   // Domain Rating by Ahrefs, per domain
+  const drOf = d => { const v = DR[String(d || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]]; return v == null ? "–" : String(v); };
+  const drCell = (d, extra = {}) => el("td", { class: "dr num", ...extra }, el("span", { class: "drv", text: drOf(d) }));
+  // Exchanges one per pair of pages (a sheet cell may hold several links, one per line), grouped by partner:
+  // partners with the most exchanges first, then the newest.
+  const exPairs = c => {
+    const urls = v => String(v || "").split(/\n+/).map(u => u.trim()).filter(Boolean);
+    const out = [];
+    for (const x of c.exchanges || []) { const t = urls(x.their_url), o = urls(x.our_url), n = Math.max(1, t.length, o.length);
+      for (let i = 0; i < n; i++) out.push({ ...x, their_url: t[i] || "", our_url: o[i] || "" }); }
+    const by = new Map(); for (const x of out) { if (!by.has(x.partner)) by.set(x.partner, []); by.get(x.partner).push(x); }
+    const gs = [...by.values()].map(g => g.sort((a, b) => (a.live || "").localeCompare(b.live || "")));
+    gs.sort((a, b) => b.length - a.length || (b.at(-1).live || "").localeCompare(a.at(-1).live || ""));
+    return gs.flatMap(g => g.map((x, i) => ({ ...x, _i: i, _n: g.length })));
+  };
+  const VIEWS = [
+    { key: "completed", label: "Completed", hint: "Each partner, the page that lists us, and the page where we listed them.",
+      head: ["Partner", "DR", "Their page (lists us)", "Our page (lists them)", "Live since"], empty: "No completed link exchanges yet.",
+      rows: exPairs, row: x => [x._i ? null : el("td", { class: "partner pgrp", rowspan: String(x._n) }, el("span", { text: x.partner }),
+          x._n > 1 ? el("small", { text: `${x._n} exchanges` }) : null), x._i ? null : drCell(x.partner, { rowspan: String(x._n) }),
+        el("td", { class: "url" }, link(x.their_url), x.their_date ? el("small", { text: x.their_date }) : null),
+        el("td", { class: "url" }, link(x.our_url), x.our_date ? el("small", { text: x.our_date }) : null),
+        el("td", { class: "when num", text: x.live || "Earlier" })] },
+    { key: "list_reply", label: "Needs our reply", hint: "They replied and the next message is ours (Late after 3 days without our answer), or we wrote and have had no reply for 5 days.",
+      head: ["Company", "DR", "Contact", "Status", "Last message"], empty: "Nobody is waiting on us." },
+    { key: "list_waiting", label: "Needs client reply", hint: "We sent the last email and are waiting for them. After 5 days with no answer it moves to Needs our reply.",
+      head: ["Company", "DR", "Contact", "Status", "Last message"], empty: "No conversation is waiting on them." },
+    { key: "list_paid", label: "Paid", hint: "They offered a paid placement instead of a link exchange.",
+      head: ["Company", "DR", "Contact", "Status", "Last message"], empty: "No paid offers." },
+    { key: "list_others", label: "Others", hint: "Not going ahead: declined, not a fit, bounced, out of office, or a partnership offer we are not taking up now.",
+      head: ["Company", "DR", "Contact", "Status", "Last message"], empty: "Nothing here." },
+  ];
+  const convRow = (x, key) => [el("td", { class: "co", text: x.company }), drCell(x.company), el("td", { text: x.contact || "–" }),
+    el("td", {}, stagePill(x.stage), x.reason && key !== "list_paid" ? el("span", { class: "pill", style: "margin-left:6px", text: x.reason }) : null,
+      x.tag ? el("span", { class: "pill warn", style: "margin-left:6px", text: x.tag }) : null),
+    el("td", { class: "when num", text: day(x.last_at) })];
+
+  function renderClient(d) {
+    const c = d.client;
+    document.title = `${c.name} · Outreach Desk`;
+    $("client-name").textContent = c.name;
+    $("client-card").replaceChildren(card(c, null));
+    calendar($("client-cal"), c.days || {}, () => {});
+    perf($("client-perf"), trendOf(c), c.outcomes ? [{ outcomes: c.outcomes, client: c }] : []);
+    let current = "completed";
+    const show = key => {
+      current = key; const v = VIEWS.find(v => v.key === key); const rows = v.rows ? v.rows(c) : (c[key] || []);
+      for (const b of $("seg").children) b.setAttribute("aria-selected", String(b.dataset.key === key));
+      $("st-hint").replaceChildren(v.hint + " DR: ", el("a", { href: "https://ahrefs.com/", target: "_blank", rel: "noopener", text: "Domain Rating by Ahrefs" }), ".");
+      $("copy-ex").hidden = key !== "completed" || !rows.length;
+      $("st-head").replaceChildren(el("tr", {}, ...v.head.map(h => el("th", { text: h }))));
+      $("st-body").replaceChildren(...(rows.length ? rows.map(x => el("tr", { class: x._i === 0 ? "g0" : null }, ...(v.row ? v.row(x) : convRow(x, key)).filter(Boolean))) : [empty(v.head.length, v.empty)]));
+      fiveRows($("st-wrap"));
+    };
+    $("copy-ex").onclick = async () => {
+      const cellv = v => String(v || "").replace(/[\t\n]+/g, " ");
+      const tsv = [["Partner", "DR", "Their page (lists us)", "Their date", "Our page (lists them)", "Our date", "Live since"].join("\t"),
+        ...exPairs(c).map(x => [x.partner, drOf(x.partner), x.their_url, x.their_date, x.our_url, x.our_date, x.live].map(cellv).join("\t"))].join("\n");
+      const b = $("copy-ex");
+      try { await navigator.clipboard.writeText(tsv); }
+      catch (e) { const t = el("textarea", {}); t.value = tsv; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); }
+      b.textContent = "Copied"; setTimeout(() => { b.textContent = "Copy table"; }, 1500);
+    };
+    $("seg").replaceChildren(...VIEWS.map(v => {
+      const n = (v.rows ? v.rows(c) : (c[v.key] || [])).length;
+      const b = el("button", { type: "button", role: "tab", "data-key": v.key }, v.label, el("b", { text: String(n) }));
+      b.addEventListener("click", () => show(v.key)); return b;
+    }));
+    show(current);
+    $("fills-when").textContent = d.updated ? `Last refreshed ${d.updated} IST` : "";
+    const fills = (c.fills || []).filter(f => typeof f.domains === "number"), srcs = c.sources || [];
+    $("src-sum").replaceChildren(...srcs.map(t => el("div", { class: "src-chip" }, el("b", { text: String(t.domains) }),
+      el("span", {}, srcLabel(t.source), el("small", { text: ` domains · last ${t.last}` })))));
+    const names = srcs.map(t => t.source);
+    const by = {}; for (const f of fills) by[f.date + "|" + f.source] = f;
+    const led = c.ledger || [];
+    const dates = led.length ? led.map(r => r.date) : [...new Set(fills.map(f => f.date))].sort().reverse();
+    const lrow = Object.fromEntries(led.map(r => [r.date, r]));
+    $("fills-head").replaceChildren(
+      el("tr", {}, el("th", { rowspan: "2", text: "Date & time" }),
+        ...names.map(nm => el("th", { class: "grp gs" }, srcLabel(nm))),
+        el("th", { colspan: "2", class: "grp gs", text: "Ledger · companies queued" })),
+      el("tr", {}, ...names.map(() => el("th", { class: "gs", text: "Added" })),
+        el("th", { class: "gs", text: "Before" }), el("th", { text: "After" })));
+    const dash = v => v == null ? "–" : String(v);
+    $("fills").replaceChildren(...(dates.length ? dates.map(d => {
+      const r = lrow[d], tm = fills.find(f => f.date === d && f.time);
+      return el("tr", {}, el("td", { class: "when num", text: pretty(d) + (tm ? ", " + tm.time : "") }),
+        ...names.map(nm => { const f = by[d + "|" + nm];
+          return f ? el("td", { class: "num strong gs", text: "+" + f.domains }) : el("td", { class: "muted gs", text: "–" }); }),
+        el("td", { class: "num gs", text: dash(r && r.before) }),
+        el("td", { class: "num strong" + (r && r.after < 0 ? " bad" : ""), text: dash(r && r.after) }));
+    }) : [empty(3 + names.length, (c.fills || []).length && !c.sources ? "The source breakdown appears after the next report." : "No domains added yet.")]));
+    $("view-client").hidden = false;
+    requestAnimationFrame(() => {   // show the header and six rows; scroll for the rest
+      const w = $("fills-wrap"), rs = [...w.querySelectorAll("tbody tr")];
+      if (rs.length > 6) w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs.slice(0, 6).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px";
+    });
+  }
+
+  // The data may be split over several cells (one per CSV line); join them back. No trimming: a split can fall on a space.
+  const unq = l => l.startsWith('"') && l.endsWith('"') ? l.slice(1, -1).replace(/""/g, '"') : l;
+  const cell = csv => csv.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.length).map(unq).join("");
+  window.whenAuthed
+    .then(() => SB.from("sheet_tabs").select("rows").eq("tab", "Site").maybeSingle())
+    .then(({ data, error }) => {
+      if (error || !data) throw new Error(error ? error.message : "no data");
+      const d = data.rows;
+      const when = d.updated ? `Updated ${d.updated} IST` : "";
+      $("updated").textContent = when; $("client-updated").textContent = when; $("home-updated").textContent = when;
+      nav(d);
+      if (MODE === "team") return renderTeam(d);
+      const c = d.clients.find(x => x.slug === SLUG);
+      if (!c) throw new Error("no client");
+      renderClient({ client: c, updated: d.updated });
+    })
+    .catch(() => { const b = $("banner"); b.textContent = "The dashboard data couldn't be loaded. Refresh the page; if it keeps failing, ask the team."; b.className = "banner err"; b.hidden = false; });
 })();
 </script>
-
-</body></html>
+</body>
+</html>
