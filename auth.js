@@ -11,9 +11,10 @@ window.whenAuthed = (async () => {
     const box = document.createElement("div");
     box.className = "login";
     box.innerHTML = `<form class="login-card"><div class="login-brand"><span class="login-mark"></span>Outreach Desk</div>
-      <p>Sign in with your work email. You'll get a one-time link.</p>
-      <input type="email" required placeholder="you@maximuslabs.ai" aria-label="Email" autocomplete="email">
-      <button type="submit">Send sign-in link</button><p class="login-msg" aria-live="polite"></p></form>`;
+      <p>Sign in with your work email and password.</p>
+      <input type="email" name="email" required placeholder="you@maximuslabs.ai" aria-label="Email" autocomplete="username">
+      <input type="password" name="password" required placeholder="Password" aria-label="Password" autocomplete="current-password">
+      <button type="submit">Sign in</button><p class="login-msg" aria-live="polite"></p></form>`;
     const st = document.createElement("style");
     st.textContent = `.login{position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#080808;padding:16px;font-family:Geist,system-ui,sans-serif}
       .login-card{width:min(380px,100%);display:grid;gap:12px;background:#0f0f0f;border:1px solid #2a2a2a;border-radius:14px;padding:24px;color:#fff}
@@ -25,9 +26,10 @@ window.whenAuthed = (async () => {
     const form = box.querySelector("form"), msg = box.querySelector(".login-msg");
     form.onsubmit = async e => {
       e.preventDefault();
-      const email = form.querySelector("input").value.trim();
-      const {error} = await SB.auth.signInWithOtp({email, options: {emailRedirectTo: location.href.split("#")[0], shouldCreateUser: true}});
-      msg.textContent = error ? "Could not send the link: " + error.message : "Check your inbox for the sign-in link.";
+      const email = form.email.value.trim(), password = form.password.value;
+      msg.textContent = "Signing in…";
+      const {error} = await SB.auth.signInWithPassword({email, password});
+      msg.textContent = error ? "Could not sign in: " + error.message : "";
     };
     SB.auth.onAuthStateChange((_e, session) => { if (session) { box.remove(); resolve(session); } });
   });
