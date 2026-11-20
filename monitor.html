@@ -1,0 +1,828 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+<title>Outreach Desk · Monitor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a dark MaximusLabs-style console. Left rail of views; Home = client cards, then Approve / Refill / Reply queues.
+   Client view = card beside its settings, then the fill log; other sections are opt-in from the Sections picker. */
+:root {
+  --ground: #080808; --surface: #0f0f0f; --raised: #141414; --rail: #111111; --line: #2a2a2a; --line-soft: #1f1f1f;
+  --text: #ffffff; --text2: #ababab; --text3: #757575;
+  --signal: #0070e0; --sky: #449afb; --deep: #00143a;
+  --good: #3dd68c; --good-soft: rgba(61, 214, 140, .12); --warn: #f5a524; --warn-soft: rgba(245, 165, 36, .12);
+  --bad: #ff6b6b; --bad-soft: rgba(255, 107, 107, .12); --sky-soft: rgba(68, 154, 251, .12);
+  --sans: "Geist", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, "Courier New", monospace;
+  --r-card: 14px; --r-ui: 8px; --r-pill: 999px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+html, body { background: var(--ground); color: var(--text) }
+body { font-family: var(--sans); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased }
+a { color: var(--sky); text-decoration: none }
+a:hover { text-decoration: underline }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px }
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance }
+h1 { font-size: 30px }
+.label { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text3) }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
+
+/* shell */
+.shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh }
+.side { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; height: 100vh; display: flex; flex-direction: column; gap: 28px;
+  padding-block: 28px; padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: 14px; background: var(--rail); border-right: 1px solid var(--line-soft) }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; letter-spacing: -0.01em }
+.brand i { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--sky), var(--signal)); flex: none }
+.navlist { display: grid; gap: 4px }
+.navgroup { margin: 10px 0 4px 10px }
+.navbtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--r-ui); color: var(--text2); font-weight: 500; font-size: 14px }
+.navbtn:hover { background: var(--raised); color: var(--text); text-decoration: none }
+.navbtn[aria-current="page"] { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--line) }
+.navbtn .count { font-family: var(--mono); font-size: 11px; min-width: 20px; text-align: center; border-radius: var(--r-pill); padding: 1px 7px; background: var(--signal); color: #fff }
+.navbtn .count:empty { display: none }
+.navbtn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none }
+.side-foot { margin-top: auto; font-size: 12px; color: var(--text3); font-family: var(--mono) }
+
+.wrap { max-width: 1160px; width: 100%; margin: 0 auto; padding-block: 36px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; min-width: 0 }
+.view { display: grid; gap: 40px; min-width: 0 }
+.page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 24px }
+.page-head .sub { color: var(--text3); font-size: 14px; margin-top: 4px }
+section { display: grid; gap: 16px; min-width: 0 }
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px }
+.sec-head h2 { font-size: 18px }
+.banner { border: 1px solid var(--line); background: var(--surface); padding: 12px 16px; border-radius: var(--r-ui); color: var(--text2) }
+.banner.err { border-color: rgba(255, 107, 107, .4); background: var(--bad-soft); color: var(--text) }
+
+/* cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 14px; align-items: start }
+.card { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 20px; display: grid; gap: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,.04) }
+.card.refill { border-color: rgba(245, 165, 36, .45) }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 8px }
+.card-head h3 { font-size: 17px }
+.card-head h3 a { color: var(--text) }
+.pill { font-family: var(--mono); font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: var(--r-pill); white-space: nowrap }
+.pill.ok { background: var(--good-soft); color: var(--good) }
+.pill.warn { background: var(--warn-soft); color: var(--warn) }
+.pill.bad { background: var(--bad-soft); color: var(--bad) }
+.pill.info { background: var(--sky-soft); color: var(--sky) }
+.pill.quiet { background: var(--raised); color: var(--text3); box-shadow: inset 0 0 0 1px var(--line) }
+.bank { display: grid; gap: 8px }
+.bank-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 8px }
+.bank-top b { font-family: var(--mono); font-size: 34px; font-weight: 500; letter-spacing: -0.03em }
+.bank-top small { color: var(--text3); font-size: 13px }
+.meter { position: relative; height: 6px; background: var(--raised); border-radius: 3px; overflow: hidden }
+.meter i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--signal), var(--sky)); border-radius: 3px }
+.refill .meter i { background: var(--warn) }
+.meter u { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text2); text-decoration: none }
+.scale { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; font-size: 12px; color: var(--text3) }
+dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 7px 12px; font-size: 13.5px; padding-top: 14px; border-top: 1px solid var(--line-soft) }
+dt { color: var(--text2) }
+dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums }
+dd.hot { color: var(--sky) }
+.alerts { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0 }
+.alerts .pill { white-space: normal; overflow-wrap: anywhere }
+
+/* home queues */
+.queues { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start }
+.types { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1.3fr); gap: 0; padding-top: 14px; border-top: 1px solid var(--line-soft) }
+.types div { display: grid; gap: 2px; padding: 0 8px; border-left: 1px solid var(--line-soft); min-width: 0 }
+.types div:first-child { border-left: 0; padding-left: 0 }
+.types b { font-family: var(--mono); font-size: 20px; font-weight: 500 }
+.types span { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .02em; color: var(--text3); white-space: nowrap }
+.types .t-paid b { color: var(--warn) }
+.types .t-partnership b { color: var(--sky) }
+.queue.type-exchange > header { box-shadow: inset 3px 0 0 var(--good) }
+.queue.type-paid > header { box-shadow: inset 3px 0 0 var(--warn) }
+.queue.type-partnership > header { box-shadow: inset 3px 0 0 var(--sky) }
+.queue > header .why { display: block; font-size: 12.5px; font-weight: 400; color: var(--text3); margin-top: 2px; letter-spacing: 0 }
+.queue { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); display: grid; min-width: 0 }
+.queue > header { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 16px 18px; border-bottom: 1px solid var(--line-soft) }
+.queue > header h2 { font-size: 15px }
+.queue .qcount { font-family: var(--mono); font-size: 12px; color: var(--text3) }
+.queue ul { list-style: none; margin: 0; padding: 0 }
+.qitem { padding: 14px 18px; border-bottom: 1px solid var(--line-soft); display: grid; gap: 6px; min-width: 0 }
+.qitem:last-child { border-bottom: 0 }
+.qitem .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline }
+.qitem .who { font-weight: 500; overflow-wrap: anywhere }
+.qitem .meta { color: var(--text3); font-size: 13px; overflow-wrap: anywhere }
+.qitem .note { color: var(--text2); font-size: 13.5px }
+.qempty { padding: 22px 18px; color: var(--text3); font-size: 14px }
+
+/* drafts */
+details.review > summary { cursor: pointer; color: var(--sky); font-size: 13.5px; list-style: none }
+details.review > summary::-webkit-details-marker { display: none }
+details.review[open] > summary { margin-bottom: 10px }
+.body { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--sans); font-size: 14px; margin: 0; padding: 12px 14px; background: var(--ground); border-radius: var(--r-ui); border: 1px solid var(--line); color: var(--text) }
+textarea.body { width: 100%; min-height: 220px; resize: vertical }
+.body mark { background: var(--warn-soft); color: var(--warn); border-radius: 3px; padding: 0 2px }
+.theirs { margin: 0; padding: 4px 0 4px 12px; border-left: 2px solid var(--line); color: var(--text3); font-size: 13px }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px }
+.btn { font: inherit; font-size: 13.5px; font-weight: 500; padding: 7px 16px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--raised); color: var(--text); cursor: pointer }
+.btn:hover { border-color: var(--text3) }
+.btn.primary { background: var(--signal); border-color: var(--signal) }
+.btn.primary:hover { background: #0a7ff0 }
+.btn.danger { color: var(--bad); border-color: rgba(255, 107, 107, .4); background: transparent }
+.btn:disabled { opacity: .45; cursor: not-allowed }
+.hint { font-size: 13px; color: var(--text3) }
+.hint.err { color: var(--bad) }
+.hint.ok { color: var(--good) }
+.confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: var(--r-ui); background: var(--sky-soft); font-size: 13.5px }
+.confirm.danger { background: var(--bad-soft) }
+.toinput { font: inherit; font-size: 13.5px; padding: 6px 10px; border-radius: var(--r-ui); border: 1px solid var(--line); background: var(--ground); color: var(--text); min-width: 0; flex: 1 1 220px }
+
+/* client view */
+.client-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 20px; display: grid; gap: 10px; min-width: 0 }
+.panel textarea, .panel input { font: inherit; font-size: 14px; padding: 9px 12px; border-radius: var(--r-ui); border: 1px solid var(--line); background: var(--ground); color: var(--text); width: 100%; min-width: 0; resize: vertical }
+.panel textarea { min-height: 150px; line-height: 1.55 }
+.panel textarea[readonly], .panel input[readonly] { color: var(--text2) }
+.linkrow { display: flex; gap: 8px; align-items: center }
+.linkrow a { flex: none; font-size: 13.5px }
+
+/* sections picker */
+.picker { position: relative }
+.picker > summary { list-style: none; cursor: pointer }
+.picker > summary::-webkit-details-marker { display: none }
+.picker .menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 230px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-ui); padding: 8px; display: grid; gap: 2px; box-shadow: 0 20px 40px rgba(0,0,0,.6) }
+.picker label { display: flex; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 6px; font-size: 14px; cursor: pointer }
+.picker label:hover { background: var(--surface) }
+.picker input { accent-color: var(--signal) }
+
+/* tables */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card) }
+table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 13.5px }
+th { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; font-family: var(--mono); font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--text3) }
+td { padding: 11px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; color: var(--text2) }
+tr:last-child td { border-bottom: 0 }
+td.strong { color: var(--text); font-weight: 500 }
+td small { display: block; color: var(--text3) }
+td.quote { max-width: 320px }
+td.when { white-space: nowrap }
+td.url a { overflow-wrap: anywhere }
+.empty { padding: 26px 16px; text-align: center; color: var(--text3) }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px }
+.tabs button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--text3); padding: 5px 12px; border-radius: var(--r-pill); cursor: pointer }
+.tabs button[aria-pressed="true"] { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--line) }
+details.blurb summary { cursor: pointer; color: var(--sky) }
+details.blurb p { white-space: pre-wrap; margin: 6px 0 0; max-width: 360px }
+
+@media (max-width: 980px) { .queues { grid-template-columns: 1fr } .client-top { grid-template-columns: 1fr } }
+@media (max-width: 380px) { .types b { font-size: 17px } }
+@media (max-width: 820px) {
+  .shell { grid-template-columns: minmax(0, 1fr) }
+  .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; border-right: 0; border-bottom: 1px solid var(--line-soft);
+    padding-block: 14px; padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+  .navlist { display: flex; overflow-x: auto; gap: 4px; flex: 1 1 100%; min-width: 0 }
+  .navgroup { display: none }
+  .navbtn { white-space: nowrap }
+  .side-foot { margin-top: 0 }
+  h1 { font-size: 26px }
+}
+@media (prefers-reduced-motion: no-preference) { .meter i { transition: width .4s ease } }
+</style>
+
+<div class="shell">
+  <nav class="side" aria-label="Views">
+    <div class="brand"><i aria-hidden="true"></i>Outreach Desk</div>
+    <div class="navlist" id="nav">
+      <a href="#home" id="nav-home" class="navbtn" aria-current="page"><span>Monitor</span><b class="count" id="count-home"></b></a>
+      <a href="desk.html" class="navbtn"><span>Reply desk</span></a>
+      <span class="label navgroup">Clients</span>
+    </div>
+    <div class="side-foot"><div id="updated">Waiting for the report…</div><a href="#" onclick="signOut();return false" style="color:var(--text3)">Sign out</a></div>
+  </nav>
+
+  <main class="wrap">
+    <div id="banner" class="banner" hidden></div>
+
+    <!-- HOME -->
+    <div id="view-home" class="view">
+      <header class="page-head">
+        <div>
+          <h1>Home</h1>
+          <div class="sub">Refreshed at 9:10 and 15:10 IST</div>
+        </div>
+      </header>
+
+      <section aria-label="Clients">
+        <div class="cards" id="cards"><div class="card empty">Client funnels load from the report.</div></div>
+      </section>
+
+      <section aria-label="Queues">
+        <div class="queues">
+          <div class="queue" id="q-approve">
+            <header><h2>Approve</h2><span class="qcount" id="qc-approve">–</span></header>
+            <ul id="ql-approve"></ul>
+          </div>
+          <div class="queue" id="q-refill">
+            <header><h2>Refill</h2><span class="qcount" id="qc-refill">–</span></header>
+            <ul id="ql-refill"></ul>
+          </div>
+          <div class="queue" id="q-reply">
+            <header><h2>Reply</h2><span class="qcount" id="qc-reply">–</span></header>
+            <ul id="ql-reply"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="home-types-h">
+        <div class="sec-head"><h2 id="home-types-h">Replies by type</h2><span class="hint">Why each reply went the way it did.</span></div>
+        <div class="queues">
+          <div class="queue type-exchange"><header><div><h2>Exchange</h2><span class="why">Link-swap replies</span></div><span class="qcount" id="home-c-Exchange">–</span></header><ul id="home-l-Exchange"></ul></div>
+          <div class="queue type-paid"><header><div><h2>Paid</h2><span class="why">They only sell placements, so no exchange</span></div><span class="qcount" id="home-c-Paid">–</span></header><ul id="home-l-Paid"></ul></div>
+          <div class="queue type-partnership"><header><div><h2>Partnership</h2><span class="why">Bigger proposals: integrations, programs</span></div><span class="qcount" id="home-c-Partnership">–</span></header><ul id="home-l-Partnership"></ul></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- CLIENT -->
+    <div id="view-client" class="view" hidden>
+      <header class="page-head">
+        <h1 id="client-name">Client</h1>
+        <details class="picker" id="picker">
+          <summary class="btn">Sections</summary>
+          <div class="menu" id="picker-menu"></div>
+        </details>
+      </header>
+
+      <div class="client-top">
+        <div id="client-card"></div>
+        <form class="panel" id="settings" novalidate>
+          <label class="label" for="f-positioning">Positioning</label>
+          <textarea id="f-positioning" rows="6" placeholder="What the client is, who buys it, how it compares. Drafts use this."></textarea>
+          <label class="label" for="f-listicles">Listicles sheet</label>
+          <div class="linkrow">
+            <input id="f-listicles" type="url" placeholder="https://docs.google.com/spreadsheets/…">
+            <a id="open-listicles" href="#" target="_blank" rel="noopener" hidden>Open</a>
+          </div>
+          <div class="row-actions" id="settings-actions"><button type="submit" class="btn" id="save-settings">Save</button><span class="hint" id="settings-note"></span></div>
+        </form>
+      </div>
+
+      <section aria-labelledby="client-types-h">
+        <div class="sec-head"><h2 id="client-types-h">Replies by type</h2><span class="hint">Why each reply went the way it did.</span></div>
+        <div class="queues">
+          <div class="queue type-exchange"><header><div><h2>Exchange</h2><span class="why">Link-swap replies</span></div><span class="qcount" id="client-c-Exchange">–</span></header><ul id="client-l-Exchange"></ul></div>
+          <div class="queue type-paid"><header><div><h2>Paid</h2><span class="why">They only sell placements, so no exchange</span></div><span class="qcount" id="client-c-Paid">–</span></header><ul id="client-l-Paid"></ul></div>
+          <div class="queue type-partnership"><header><div><h2>Partnership</h2><span class="why">Bigger proposals: integrations, programs</span></div><span class="qcount" id="client-c-Partnership">–</span></header><ul id="client-l-Partnership"></ul></div>
+        </div>
+      </section>
+
+      <section data-sec="drafts" aria-labelledby="h-drafts">
+        <div class="sec-head"><h2 id="h-drafts">Replies to approve</h2><span class="hint">Sent from the client's mailbox, in the same thread.</span></div>
+        <div class="queue"><ul id="client-drafts"></ul></div>
+      </section>
+
+      <section data-sec="fills" aria-labelledby="h-fills">
+        <div class="sec-head"><h2 id="h-fills">Log data</h2><span class="hint">One row per funnel fill.</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Source</th><th>Waiting at start</th><th>Added</th><th>Left in pool</th><th>Note</th></tr></thead>
+            <tbody id="log-fills"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section data-sec="exchanges" aria-labelledby="h-exchanges">
+        <div class="sec-head"><h2 id="h-exchanges">Exchanges</h2><span class="hint">Dates are the day of the email it came in.</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Company</th><th>Stage</th><th>Their page (link to us)</th><th>Our page (link to them)</th><th>Blurbs</th><th>Live link</th></tr></thead>
+            <tbody id="exchanges"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section data-sec="threads" aria-labelledby="h-threads">
+        <div class="sec-head">
+          <h2 id="h-threads">Threads</h2>
+          <div class="tabs" role="group" aria-label="Show threads">
+            <button type="button" data-f="needs" aria-pressed="true">Needs reply</button>
+            <button type="button" data-f="open" aria-pressed="false">All open</button>
+            <button type="button" data-f="links" aria-pressed="false">Backlinks</button>
+            <button type="button" data-f="all" aria-pressed="false">Everything</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Company</th><th>Stage</th><th>Last from</th><th>Last message</th><th>Latest from them</th><th>Next action</th><th></th></tr></thead>
+            <tbody id="threads"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section data-sec="runs" aria-labelledby="h-runs">
+        <div class="sec-head"><h2 id="h-runs">Report runs</h2><span class="hint">Twice a day.</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Run at</th><th>Sequence</th><th>Bank</th><th>Step 1</th><th>Pool</th><th>Scheduled</th><th>Sent</th><th>Replies</th><th>Open</th><th>Needs reply</th><th>Agreed</th><th>Backlinks</th></tr></thead>
+            <tbody id="log-runs"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(() => {
+  // ---------- settings (the GitHub copy is built from this file with READONLY = true and a PUBLISHED id)
+  const READONLY = true;   // approvals happen in the Reply desk
+  const PUBLISHED = "supabase";
+  const SHEET = "12UxMhzyCxDelDsDqi1MtYV5D466QbZ4XA9ANIX2lbdg";
+  const SERVER = "Google Sheets", COMPOSIO = "Composio";
+  const THRESHOLD = 30;
+  const CLIENTS = ["Versatile Club", "EasyWebinar", "Luca", "MaximusLabs"];
+  const ACCOUNTS = { "Versatile Club": "gmail_hose-fetal", "EasyWebinar": "gmail_rever-mastax", "Luca": "gmail_resize-reopen", "MaximusLabs": "gmail_flouse-second" };
+  const COL = { reply: "AA", status: "AB", to: "AC", at: "AD" };
+  const OPEN = ["New reply", "In conversation", "Agreed, awaiting link", "Wants payment", "Referred to colleague", "Out of office", "Replied, read in mailbox"];
+  const SECTIONS = [
+    { id: "fills", label: "Log data (funnel fills)", on: true },
+    { id: "drafts", label: "Replies to approve", on: false },
+    { id: "exchanges", label: "Exchanges", on: false },
+    { id: "threads", label: "Threads", on: false },
+    { id: "runs", label: "Report runs", on: false },
+  ];
+  const state = { dash: null, threads: null, runs: null, fills: null, settings: null, client: "", filter: "needs", mcp: null, busy: {}, notes: {}, open: {} };
+
+  // ---------- helpers
+  const $ = id => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) { if (v == null) continue; if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v); }
+    for (const k of kids) if (k != null && k !== false) n.append(k);
+    return n;
+  };
+  const num = v => { const n = Number(String(v ?? "").replace(/,/g, "")); return Number.isFinite(n) && String(v).trim() !== "" ? n : null; };
+  const slug = n => "client-" + n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const nowIST = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 16).replace("T", " ");
+  const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+  const names = () => [...new Set([...CLIENTS, ...((state.dash && state.dash.clients) || []).map(c => c.Client)])];
+  const stagePill = s => {
+    const cls = s === "Link live" ? "ok" : s === "New reply" || s === "Wants payment" ? "bad" : s === "Agreed, awaiting link" ? "info"
+      : ["Declined", "Not a fit", "Bounced", "Unsubscribed"].includes(s) ? "quiet" : "warn";
+    return el("span", { class: "pill " + cls, text: s || "New reply" });
+  };
+  const highlightAdds = text => {
+    const pre = el("pre", { class: "body" });
+    String(text).split(/(\[ADD:[^\]]*\])/).forEach(p => pre.append(/^\[ADD:/.test(p) ? el("mark", { text: p }) : p));
+    return pre;
+  };
+  function showBanner(msg, isErr) { const b = $("banner"); b.textContent = msg; b.className = "banner" + (isErr ? " err" : ""); b.hidden = !msg; }
+  function errorText(err, what) {
+    switch (err && err.code) {
+      case "server_not_connected": return `Add the ${SERVER} connector in claude.ai Settings → Connectors to see the ${what}.`;
+      case "needs_reauth": return `Reconnect ${SERVER} in claude.ai Settings → Connectors to see the ${what}.`;
+      case "selection_required": return `Choose which ${SERVER} connector this page should use when claude.ai asks.`;
+      case "not_in_manifest": case "approval_required": case "consent_required": return `Allow this page to use ${SERVER} to see the ${what}.`;
+      case "tool_error": return `${SERVER} could not read the ${what}. Check that your Google account can open the report sheet.`;
+      case "server_unavailable": return `${SERVER} did not answer just now. The page tries again on its next refresh.`;
+      default: return `The ${what} could not be loaded (${(err && err.code) || "unknown error"}).`;
+    }
+  }
+
+  // ---------- parsers
+  function parseDash(values) {
+    const out = { updated: "", clients: [], total: null, actions: [] };
+    if (!values || !values.length) return out;
+    out.updated = String((values[0] || [])[0] || "").replace(/^Outreach dashboard - updated /, "").replace(/\s*IST$/, "");
+    const hi = values.findIndex(r => r && r[0] === "Client");
+    if (hi < 0) return out;
+    const head = values[hi];
+    for (let i = hi + 1; i < values.length; i++) {
+      const r = values[i]; if (!r || !r[0]) break;
+      const o = Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""]));
+      if (r[0] === "All clients") out.total = o; else out.clients.push(o);
+    }
+    return out;
+  }
+  function parseThreads(values) {
+    if (!values || values.length < 2) return [];
+    const head = values[0];
+    return values.slice(1).map((r, i) => [r, i + 2]).filter(([r]) => r && r[0]).map(([r, row]) => {
+      const o = Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""]));
+      o.row = row;
+      o.stage = String(o["Stage override (you)"] || "").trim() || o.Stage || "New reply";
+      const rt = String(o["Reply type"] || "").trim().toLowerCase();
+      o.type = rt === "paid" ? "Paid" : rt === "partnership" ? "Partnership" : rt === "exchange" ? "Exchange" : (o.stage === "Wants payment" ? "Paid" : "Exchange");
+      return o;
+    });
+  }
+  function rowsOf(values) {
+    if (!values || values.length < 2) return [];
+    const head = values[0];
+    return values.slice(1).filter(r => r && r[0]).map(r => Object.fromEntries(head.map((h, j) => [h, r[j] ?? ""])));
+  }
+  function parseSettings(values) {
+    const out = {};
+    (values || []).slice(1).forEach((r, i) => { if (r && r[0]) out[r[0]] = { row: i + 2, positioning: r[1] || "", listicles: r[2] || "", at: r[3] || "" }; });
+    out._next = Math.max(1, (values || []).length) + 1;
+    return out;
+  }
+
+  // ---------- derived lists
+  const drafts = name => (state.threads || []).filter(t => ["Pending", "Sending"].includes(t["Draft status"]) && (!name || t.Client === name));
+  const needsReply = name => (state.threads || []).filter(t => t["Needs our reply"] === "Yes" && t["Draft status"] !== "Pending" && (!name || t.Client === name));
+  const TYPES = ["Exchange", "Paid", "Partnership"];
+  const replied = name => (state.threads || []).filter(t => (!name || t.Client === name) && (String(t["First reply at"] || "").trim() || t.Key.includes("|apollo|")));
+  const typeCounts = name => Object.fromEntries(TYPES.map(ty => [ty, new Set(replied(name).filter(t => t.type === ty).map(t => (t["Company domain"] || t.Key).toLowerCase())).size]));
+  const refills = () => ((state.dash && state.dash.clients) || []).filter(c => c["Refill needed?"] === "YES");
+
+  // ---------- client card
+  function clientCard(c, linked) {
+    const needsRefill = c["Refill needed?"] === "YES";
+    const seq = c.Sequence || "Unknown";
+    const card = el("article", { class: "card" + (needsRefill ? " refill" : "") });
+    card.append(el("div", { class: "card-head" },
+      el("h3", {}, linked ? el("a", { href: "#" + slug(c.Client), text: c.Client }) : c.Client),
+      el("span", { class: "alerts" },
+        needsRefill ? el("span", { class: "pill warn", text: "Refill" }) : null,
+        el("span", { class: "pill " + (seq === "Active" ? "ok" : "quiet"), text: seq === "Active" ? "Sending" : seq }))));
+    if (state.threads) {
+      const n = typeCounts(c.Client);
+      card.append(el("div", { class: "types", role: "group", "aria-label": "Replies by type" },
+        ...TYPES.map(ty => el("div", { class: "t-" + ty.toLowerCase() }, el("b", { text: String(n[ty]) }), el("span", { text: ty })))));
+    }
+    const dl = el("dl");
+    for (const [label, key] of [["Scheduled", "Emails scheduled"], ["Sent", "Emails sent (total)"],
+      ["Replies today", "Replies today"], ["Open threads", "Open threads"],
+      ["Needs our reply", "Needs our reply"], ["Agreed, awaiting link", "Agreed, awaiting link"], ["Backlinks", "Backlinks secured"]]) {
+      const v = c[key] === "" || c[key] == null ? "–" : c[key];
+      dl.append(el("dt", { text: label }), el("dd", { class: key === "Needs our reply" && num(v) > 0 ? "hot" : null, text: v }));
+    }
+    card.append(dl);
+    const alerts = String(c.Alerts || "").split(";").map(x => x.trim()).filter(Boolean).filter(x => !/^Bank /.test(x));
+    if (alerts.length) card.append(el("div", { class: "alerts" }, ...alerts.map(x => el("span", { class: "pill warn", text: x }))));
+    return card;
+  }
+
+  // ---------- draft item (Approve queue and client section)
+  function draftItem(t) {
+    const li = el("li", { class: "qitem" });
+    const busy = state.busy[t.Key], n = state.notes[t.Key];
+    li.append(el("div", { class: "top" }, el("span", { class: "who", text: t["Company domain"] || "Unknown company" }), el("span", { class: "label", text: t.Client })),
+      el("div", { class: "meta", text: `To ${t["Draft to"] || "?"} · from ${t.Mailbox}` }));
+    const det = el("details", { class: "review" });
+    if (state.open[t.Key]) det.open = true;
+    det.addEventListener("toggle", () => { state.open[t.Key] = det.open; });
+    det.append(el("summary", { text: det.open ? "Hide reply" : "Review reply" }));
+    det.addEventListener("toggle", () => { det.querySelector("summary").textContent = det.open ? "Hide reply" : "Review reply"; });
+    if (t["Latest from them"]) det.append(el("blockquote", { class: "theirs", text: t["Latest from them"] }));
+    const view = highlightAdds(t["Draft reply"]);
+    det.append(view);
+    li.append(det);
+    if (n) li.append(el("p", { class: "hint " + (n.cls || ""), text: n.msg }));
+    if (t["Draft status"] === "Sending" && !busy) { li.append(el("p", { class: "hint err", text: "A send was started but not confirmed. Check the thread in Gmail first." })); return li; }
+    if (READONLY) { det.append(el("p", { class: "hint", text: "Approve this on the team's Claude page." })); return li; }
+    if (t["Draft status"] !== "Pending") return li;
+    const actions = el("div", { class: "row-actions" });
+    det.append(actions);
+    const hasAdd = /\[ADD:/.test(t["Draft reply"]);
+    const approve = el("button", { type: "button", class: "btn primary", text: busy === "send" ? "Sending…" : "Approve & send" });
+    const edit = el("button", { type: "button", class: "btn", text: "Edit" });
+    const deny = el("button", { type: "button", class: "btn danger", text: busy === "deny" ? "Discarding…" : "Deny" });
+    approve.disabled = !!busy || hasAdd || !ACCOUNTS[t.Client]; edit.disabled = !!busy; deny.disabled = !!busy;
+    actions.append(approve, edit, deny);
+    if (hasAdd) actions.append(el("span", { class: "hint", text: "Fill the highlighted parts with Edit first." }));
+    if (!ACCOUNTS[t.Client]) actions.append(el("span", { class: "hint", text: "This mailbox isn't connected for sending." }));
+    const ask = (msg, danger, go, label) => {
+      actions.querySelectorAll(".confirm").forEach(x => x.remove());
+      const yes = el("button", { type: "button", class: "btn " + (danger ? "danger" : "primary"), text: label });
+      const no = el("button", { type: "button", class: "btn", text: "Cancel" });
+      const c = el("div", { class: "confirm" + (danger ? " danger" : "") }, el("span", { text: msg }), yes, no);
+      yes.addEventListener("click", go, { once: true }); no.addEventListener("click", () => c.remove());
+      actions.append(c);
+    };
+    approve.addEventListener("click", () => ask(`Send to ${t["Draft to"]} from ${t.Mailbox}?`, false, () => act(t, "send", t["Draft reply"], t["Draft to"]), "Send now"));
+    deny.addEventListener("click", () => ask("Discard this draft? Nothing is sent.", true, () => act(t, "deny"), "Discard"));
+    edit.addEventListener("click", () => {
+      state.editing = t.Key;
+      const area = el("textarea", { class: "body", "aria-label": "Edit the reply" }); area.value = t["Draft reply"];
+      const to = el("input", { class: "toinput", type: "email", value: t["Draft to"], "aria-label": "Send to" });
+      const send = el("button", { type: "button", class: "btn primary", text: "Send edited reply" });
+      const cancel = el("button", { type: "button", class: "btn", text: "Cancel" });
+      const msg = el("span", { class: "hint" });
+      view.replaceWith(area);
+      actions.replaceChildren(el("span", { class: "label", text: "To" }), to, send, cancel, msg);
+      area.focus();
+      cancel.addEventListener("click", () => { state.editing = null; renderAll(); });
+      send.addEventListener("click", () => {
+        const text = area.value.trim(), addr = to.value.trim();
+        if (/\[ADD:/.test(text)) { msg.textContent = "Replace every [ADD: …] part first."; msg.className = "hint err"; return; }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(addr)) { msg.textContent = "Enter one valid email address."; msg.className = "hint err"; return; }
+        ask(`Send your edited reply to ${addr} from ${t.Mailbox}?`, false, () => { state.editing = null; act(t, "send", text, addr); }, "Send now");
+      });
+    });
+    return li;
+  }
+
+  // ---------- sheet writes and sending (Claude page only)
+  const values = res => { const p = res && res.payload; return (p && p.values) || []; };
+  const sheetWrite = (range, vals) => state.mcp.callTool(SERVER, "update_values", { spreadsheetId: SHEET, range, values: vals }, { cache: false });
+  async function rowNow(t) {
+    const r = await state.mcp.callTool(SERVER, "get_values", { spreadsheetId: SHEET, range: `Threads!A${t.row}:AD${t.row}` }, { cache: false });
+    const v = values(r)[0] || [];
+    return { key: v[0] || "", status: v[27] || "" };
+  }
+  const firstResult = p => p && p.data && p.data.results && p.data.results[0];
+  async function act(t, kind, text, to) {
+    const key = t.Key; state.busy[key] = kind; state.notes[key] = null; renderAll();
+    const note = (msg, cls) => { state.notes[key] = { msg, cls }; };
+    try {
+      const live = await rowNow(t);
+      if (live.key !== t.Key) { note("The sheet changed since this loaded. Reload and try again.", "err"); return; }
+      if (live.status !== "Pending") { note(`Already marked "${live.status || "empty"}" in the sheet.`, "err"); t["Draft status"] = live.status; return; }
+      if (kind === "deny") { await sheetWrite(`Threads!${COL.status}${t.row}:${COL.at}${t.row}`, [["Denied", t["Draft to"], nowIST()]]); t["Draft status"] = "Denied"; note("Draft discarded.", "ok"); return; }
+      await sheetWrite(`Threads!${COL.status}${t.row}`, [["Sending"]]); t["Draft status"] = "Sending";
+      let result;
+      try {
+        result = await state.mcp.callTool(COMPOSIO, "COMPOSIO_MULTI_EXECUTE_TOOL", {
+          tools: [{ tool_slug: "GMAIL_REPLY_TO_THREAD", account: ACCOUNTS[t.Client], arguments: {
+            thread_id: t.Key.split("|").slice(1).join("|"), recipient_email: to, message_body: text, is_html: false, include_signature: false } }],
+          sync_response_to_workbench: false, current_step: "SEND_APPROVED_REPLY", thought: "Send a reply the outreach manager approved." }, { cache: false });
+      } catch (err) {
+        if (err && err.code === "tool_error") { await sheetWrite(`Threads!${COL.status}${t.row}`, [["Pending"]]); t["Draft status"] = "Pending"; note(`Not sent: ${err.message || "Composio refused the call"}.`, "err"); }
+        else note(`The send may or may not have gone through (${(err && err.code) || "no answer"}). Check Gmail before trying again.`, "err");
+        return;
+      }
+      const res = firstResult(result.payload);
+      if (!(res && res.response && res.response.successful === true)) {
+        await sheetWrite(`Threads!${COL.status}${t.row}`, [["Pending"]]); t["Draft status"] = "Pending";
+        note(`Not sent: ${String((res && res.response && res.response.error) || "Gmail refused the reply.").slice(0, 200)}`, "err"); return;
+      }
+      await sheetWrite(`Threads!${COL.reply}${t.row}:${COL.at}${t.row}`, [[text, "Sent", to, nowIST()]]);
+      Object.assign(t, { "Draft reply": text, "Draft status": "Sent", "Draft to": to });
+      note(`Sent to ${to} from ${t.Mailbox}.`, "ok");
+    } catch (err) {
+      note(errorText(err, "sheet"), "err");
+    } finally {
+      delete state.busy[key];
+      try { await state.mcp.invalidate(SERVER); } catch (e) {}
+      renderAll();
+    }
+  }
+
+  // ---------- renders
+  function renderNav() {
+    const nav = $("nav");
+    if (state.dash) $("updated").textContent = state.dash.updated ? `Updated ${state.dash.updated} IST` : "No report run yet";
+    nav.querySelectorAll(".navbtn.client").forEach(n => n.remove());
+    for (const n of names()) {
+      const row = state.dash && state.dash.clients.find(c => c.Client === n);
+      const cnt = drafts(n).length + needsReply(n).length;
+      nav.append(el("a", { href: "#" + slug(n), class: "navbtn client" },
+        el("span", { text: n }),
+        row && row["Refill needed?"] === "YES" && !cnt ? el("i", { class: "dot", title: "Needs a refill" }) : null,
+        el("b", { class: "count", text: cnt ? String(cnt) : "", title: "Replies to approve or answer" })));
+    }
+    const total = drafts().length + needsReply().length + refills().length;
+    $("count-home").textContent = total ? String(total) : "";
+    const here = "#" + (state.client ? slug(state.client) : "home");
+    for (const a of nav.querySelectorAll(".navbtn")) a.setAttribute("aria-current", a.getAttribute("href") === here ? "page" : "false");
+  }
+
+  function fillQueue(id, items, emptyText) {
+    const ul = $("ql-" + id); ul.replaceChildren();
+    $("qc-" + id).textContent = items === null ? "–" : String(items.length);
+    if (items === null) { ul.append(el("li", { class: "qempty", text: "Loading…" })); return; }
+    if (!items.length) { ul.append(el("li", { class: "qempty", text: emptyText })); return; }
+    items.forEach(i => ul.append(i));
+  }
+
+  function typeItem(t, showClient) {
+    return el("li", { class: "qitem" },
+      el("div", { class: "top" }, el("span", { class: "who", text: t["Company domain"] || "Unknown company" }),
+        showClient ? el("a", { class: "label", href: "#" + slug(t.Client), text: t.Client }) : el("span", { class: "num label", text: (t["Last reply at"] || "").slice(0, 10) })),
+      el("div", { class: "meta" }, stagePill(t.stage), t["Needs our reply"] === "Yes" ? el("span", { class: "pill bad", text: "Needs reply" }) : null),
+      t["Next action"] ? el("div", { class: "note", text: t["Next action"] }) : null);
+  }
+  function renderTypes(prefix, name) {
+    if (!state.threads) return;
+    const rank = t => (t["Needs our reply"] === "Yes" ? 0 : OPEN.includes(t.stage) ? 1 : 2);
+    for (const ty of TYPES) {
+      const list = replied(name).filter(t => t.type === ty)
+        .sort((a, b) => rank(a) - rank(b) || String(b["Last message at"]).localeCompare(String(a["Last message at"])));
+      $(`${prefix}-c-${ty}`).textContent = String(list.length);
+      const empty = { Exchange: "No exchange replies yet.", Paid: "Nobody has asked for payment.", Partnership: "No partnership proposals." }[ty];
+      $(`${prefix}-l-${ty}`).replaceChildren(...(list.length ? list.map(t => typeItem(t, !name)) : [el("li", { class: "qempty", text: empty })]));
+    }
+  }
+
+  function renderHome() {
+    const d = state.dash;
+    const box = $("cards");
+    if (d) { box.replaceChildren(...(d.clients.length ? d.clients.map(c => clientCard(c, true)) : [el("div", { class: "card empty", text: "No client rows yet." })])); }
+    renderTypes("home", "");
+    if (state.editing) return;
+    fillQueue("approve", state.threads ? drafts().map(draftItem) : null, "No replies waiting for approval.");
+    fillQueue("refill", d ? refills().map(c => el("li", { class: "qitem" },
+      el("div", { class: "top" }, el("a", { class: "who", href: "#" + slug(c.Client), text: c.Client })),
+      el("div", { class: "note", text: "Running low on companies to email. Run the top-of-funnel fill." }))) : null, "No client needs a refill.");
+    fillQueue("reply", state.threads ? needsReply().sort((a, b) => String(a["Last message at"]).localeCompare(String(b["Last message at"]))).map(t => el("li", { class: "qitem" },
+      el("div", { class: "top" }, el("span", { class: "who", text: t["Company domain"] || "Unknown company" }), el("span", { class: "label", text: t.Client })),
+      el("div", { class: "meta" }, stagePill(t.stage), " ", el("span", { class: "num", text: t["Last message at"] || "" })),
+      t["Next action"] ? el("div", { class: "note", text: t["Next action"] }) : null,
+      t["Gmail link"] && !READONLY ? el("a", { href: t["Gmail link"], target: "_blank", rel: "noopener", text: "Open in Gmail" }) : null)) : null, "No thread is waiting on us.");
+  }
+
+  function renderClient() {
+    if (!state.client) return;
+    $("client-name").textContent = state.client;
+    const d = state.dash, one = $("client-card");
+    if (d) { const mine = d.clients.find(c => c.Client === state.client); one.replaceChildren(mine ? clientCard(mine, false) : el("div", { class: "card empty", text: "No row in the latest report yet." })); }
+    renderSettings();
+    renderSections();
+    if (!state.editing && state.threads) {
+      const ul = $("client-drafts"); const list = drafts(state.client);
+      ul.replaceChildren(...(list.length ? list.map(draftItem) : [el("li", { class: "qempty", text: "No replies waiting for approval." })]));
+    }
+    renderTypes("client", state.client);
+    renderFills(); renderRuns(); renderExchanges(); renderThreads();
+  }
+
+  function renderSettings() {
+    if (!state.client || !state.settings || state.editingSettings) return;
+    const cfg = state.settings[state.client] || {};
+    $("f-positioning").value = cfg.positioning || "";
+    $("f-listicles").value = cfg.listicles || "";
+    const open = $("open-listicles");
+    open.hidden = !/^https?:\/\//.test(cfg.listicles || "");
+    if (!open.hidden) open.href = cfg.listicles;
+    $("settings-note").textContent = READONLY ? "" : cfg.at ? `Saved ${cfg.at}` : "Not saved yet";
+    $("settings-note").className = "hint";
+  }
+
+  function sectionPrefs() { return Object.assign(Object.fromEntries(SECTIONS.map(s => [s.id, s.on])), store.get("od-sections") || {}); }
+  function renderSections() {
+    const prefs = sectionPrefs();
+    for (const s of SECTIONS) { const sec = document.querySelector(`[data-sec="${s.id}"]`); if (sec) sec.hidden = !prefs[s.id]; }
+    const menu = $("picker-menu");
+    if (!menu.children.length) for (const s of SECTIONS) {
+      const box = el("input", { type: "checkbox", id: "sec-" + s.id });
+      box.checked = !!prefs[s.id];
+      box.addEventListener("change", () => { const p = sectionPrefs(); p[s.id] = box.checked; store.set("od-sections", p); renderSections(); });
+      menu.append(el("label", { for: "sec-" + s.id }, box, s.label));
+    }
+  }
+
+  function renderFills() {
+    const body = $("log-fills"); if (!state.fills) return;
+    const mine = state.fills.filter(r => r.Client === state.client).reverse();
+    body.replaceChildren(...(mine.length ? mine.map(r => el("tr", {},
+      el("td", { class: "when num", text: r.Date }), el("td", { text: r.Source || "Pool (AI visibility tool)" }),
+      el("td", { class: "num", text: r["Waiting at start"] }), el("td", { class: "num strong", text: r.Added }),
+      el("td", { class: "num", text: r["Left in pool"] }), el("td", { class: "quote", text: r.Message }))) : [el("tr", {}, el("td", { colspan: "6", class: "empty", text: "No funnel fills logged for this client yet." }))]));
+  }
+  function renderRuns() {
+    const body = $("log-runs"); if (!state.runs) return;
+    const mine = state.runs.filter(r => r.Client === state.client).reverse();
+    body.replaceChildren(...(mine.length ? mine.map(r => el("tr", {}, el("td", { class: "when num", text: r["Run at"] }), el("td", { text: r.Sequence }),
+      ...["Bank companies", "Bank people", "Pool companies", "Scheduled", "Sent total", "Replies total", "Open threads", "Needs our reply", "Agreed", "Backlinks"].map(k => el("td", { class: "num", text: r[k] })))) :
+      [el("tr", {}, el("td", { colspan: "12", class: "empty", text: "No report runs logged yet." }))]));
+  }
+  function renderExchanges() {
+    const body = $("exchanges"); if (!state.threads) return;
+    const has = t => ["URL we gave them", "URL they gave us", "Blurb they sent us", "Blurb we sent them", "Backlink URL"].some(k => String(t[k] || "").trim());
+    const list = state.threads.filter(t => t.Client === state.client && has(t));
+    const link = (url, date) => {
+      if (!url) return el("td", { text: "–" });
+      return el("td", { class: "url" }, el("a", { href: /^https?:\/\//.test(url) ? url : "https://" + url, target: "_blank", rel: "noopener", text: url }), date ? el("small", { text: `on ${date}` }) : null);
+    };
+    const blurb = (label, text, date) => text ? el("details", { class: "blurb" }, el("summary", { text: `${label}${date ? " · " + date : ""}` }), el("p", { text })) : null;
+    body.replaceChildren(...(list.length ? list.map(t => {
+      const b = el("td", {}, blurb("They sent us", t["Blurb they sent us"], t["Date of their blurb"]), blurb("We sent them", t["Blurb we sent them"], t["Date of our blurb"]));
+      if (!b.childNodes.length) b.textContent = "–";
+      return el("tr", {}, el("td", { class: "strong", text: t["Company domain"] || "–" }), el("td", {}, stagePill(t.stage)),
+        link(t["URL they gave us"], t["Date they gave it"]), link(t["URL we gave them"], t["Date we gave it"]), b, link(t["Backlink URL"], ""));
+    }) : [el("tr", {}, el("td", { colspan: "6", class: "empty", text: "No agreed URLs or blurbs recorded yet." }))]));
+  }
+  function renderThreads() {
+    const body = $("threads"); if (!state.threads) return;
+    let list = state.threads.filter(t => t.Client === state.client);
+    if (state.filter === "needs") list = list.filter(t => t["Needs our reply"] === "Yes");
+    else if (state.filter === "open") list = list.filter(t => OPEN.includes(t.stage));
+    else if (state.filter === "links") list = list.filter(t => t.stage === "Link live");
+    list.sort((a, b) => String(b["Last message at"]).localeCompare(String(a["Last message at"])));
+    body.replaceChildren(...(list.length ? list.map(t => el("tr", {},
+      el("td", { class: "strong" }, t["Company domain"] || "–", el("small", { text: t.Contact || "" })),
+      el("td", {}, stagePill(t.stage)), el("td", { text: t["Last message from"] || "–" }), el("td", { class: "when num", text: t["Last message at"] || "–" }),
+      el("td", { class: "quote", text: t["Latest from them"] || "" }), el("td", { text: t["Next action"] || "" }),
+      el("td", {}, t["Gmail link"] && !READONLY ? el("a", { href: t["Gmail link"], target: "_blank", rel: "noopener", text: "Open" }) : null))) :
+      [el("tr", {}, el("td", { colspan: "7", class: "empty", text: "Nothing here." }))]));
+  }
+  for (const b of document.querySelectorAll(".tabs button")) b.addEventListener("click", () => {
+    state.filter = b.dataset.f;
+    document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    renderThreads();
+  });
+
+  function renderAll() { renderNav(); if (state.client) renderClient(); else renderHome(); }
+
+  // ---------- settings save (Claude page only)
+  if (READONLY) { $("f-positioning").readOnly = true; $("f-listicles").readOnly = true; $("save-settings").hidden = true; }
+  for (const id of ["f-positioning", "f-listicles"]) $(id).addEventListener("input", () => { state.editingSettings = true; });
+  $("settings").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (READONLY) return;
+    const note = $("settings-note");
+    if (!state.mcp || !state.settings) { note.textContent = "The sheet isn't loaded yet."; note.className = "hint err"; return; }
+    const link = $("f-listicles").value.trim();
+    if (link && !/^https?:\/\//.test(link)) { note.textContent = "The link must start with https://"; note.className = "hint err"; return; }
+    const cfg = state.settings[state.client], row = cfg ? cfg.row : state.settings._next, at = nowIST(), pos = $("f-positioning").value.trim();
+    $("save-settings").disabled = true; note.textContent = "Saving…"; note.className = "hint";
+    try {
+      await sheetWrite(`Clients!A${row}:D${row}`, [[state.client, pos, link, at]]);
+      state.settings[state.client] = { row, positioning: pos, listicles: link, at };
+      if (!cfg) state.settings._next = row + 1;
+      state.editingSettings = false; renderSettings();
+      note.textContent = `Saved ${at}. Drafts use it from the next report run.`; note.className = "hint ok";
+      try { await state.mcp.invalidate(SERVER); } catch (err) {}
+    } catch (err) { note.textContent = errorText(err, "client settings"); note.className = "hint err"; }
+    finally { $("save-settings").disabled = false; }
+  });
+
+  // ---------- routing
+  function route() {
+    const h = (location.hash || "#home").slice(1);
+    const found = names().find(n => slug(n) === h) || "";
+    state.client = found; state.editingSettings = false; state.editing = null;
+    $("view-home").hidden = !!found; $("view-client").hidden = !found;
+    document.title = found ? `${found} · Outreach Desk` : "Outreach Desk";
+    $("picker").open = false;
+    renderAll(); window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", route);
+  document.addEventListener("click", e => { const p = $("picker"); if (p.open && !p.contains(e.target)) p.open = false; });
+  route();
+
+  // ---------- data
+  const TABS = [
+    { id: "dash", tab: "Dashboard", range: "Dashboard!A1:Q60", gid: 1703437801, take: v => { state.dash = parseDash(v); } },
+    { id: "threads", tab: "Threads", range: "Threads!A1:AE3000", gid: 1717218297, take: v => { state.threads = parseThreads(v); } },
+    { id: "clients", tab: "Clients", range: "Clients!A1:D50", gid: 33657286, take: v => { state.settings = parseSettings(v); } },
+    { id: "runs", tab: "Dashboard runs", range: "Dashboard runs!A1:M3000", gid: 1286745943, take: v => { state.runs = rowsOf(v); } },
+    { id: "fills", tab: "Status", range: "Status!A1:G2000", gid: 799832616, take: v => { state.fills = rowsOf(v); } },
+  ];
+  const parseCSV = text => {
+    const rows = []; let row = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+      else if (c === '"') q = true; else if (c === ",") { row.push(cell); cell = ""; }
+      else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; } else if (c !== "\r") cell += c;
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  };
+
+  if (PUBLISHED) {                                   // GitHub copy: the sheet's "Publish to web" CSVs
+    const load = async () => {
+      const failed = [];
+      await Promise.all(TABS.map(async t => {
+        try {
+          await window.whenAuthed;
+          const { data, error } = await SB.from("sheet_tabs").select("rows").eq("tab", t.tab).maybeSingle();
+          if (error || !data) throw new Error(error ? error.message : "empty");
+          t.take(data.rows);
+        } catch (e) { failed.push(t.id); }
+      }));
+      showBanner(failed.length === TABS.length ? "No report data in the database yet, or this login is not allowed." :
+        failed.length ? `Some parts couldn't load (${failed.join(", ")}). They try again in 5 minutes.` : "", failed.length > 0);
+      renderAll();
+    };
+    load(); setInterval(load, 60 * 1000);
+    return;
+  }
+  if (READONLY) { showBanner("This page isn't connected to the report sheet yet.", true); return; }
+
+  (async () => {                                     // Claude page: the viewer's Google Sheets connector
+    const mcp = window.claude ? await window.claude.use("mcp") : null;
+    state.mcp = mcp;
+    if (!mcp) { showBanner("Open this page in claude.ai with the Google Sheets connector to load the report.", false); return; }
+    const errs = {};
+    const DENY = ["needs_reauth", "server_not_connected", "blocked_by_policy", "approval_required", "not_in_manifest", "consent_required"];
+    const report = () => {
+      const e = Object.values(errs).filter(Boolean);
+      showBanner(!e.length ? "" : e.every(x => x.code === e[0].code) ? errorText(e[0], "report") : e.map(x => x.text).join(" "), !!e.length);
+    };
+    const fail = (t, err) => { errs[t.id] = { code: err && err.code, text: errorText(err, t.id) }; if (DENY.includes(err && err.code)) t.take([]); };
+    const opts = { cache: { staleTime: 60 * 1000, gcTime: 6 * 60 * 60 * 1000 } };
+    for (const t of TABS) {
+      try { t.take(values(await mcp.callTool(SERVER, "get_values", { spreadsheetId: SHEET, range: t.range }, opts))); errs[t.id] = null; }
+      catch (err) { fail(t, err); }
+    }
+    report(); renderAll();
+    for (const t of TABS) mcp.watchTool(SERVER, "get_values", { spreadsheetId: SHEET, range: t.range }, ev => {
+      if (ev.type === "data") { errs[t.id] = null; t.take(values(ev.result)); } else fail(t, ev.error);
+      report(); renderAll();
+    }, Object.assign({ refetchInterval: 5 * 60 * 1000 }, opts));
+  })();
+})();
+</script>
+
+</body></html>
