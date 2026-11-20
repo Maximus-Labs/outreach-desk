@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Outreach Tracker · Outreach Desk</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Roboto:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+<style>
+/* Shell matches the desk (dark sidebar); the sheet itself mirrors Google Sheets. */
+:root{--ground:#080808;--rail:#111;--line-soft:#1f1f1f;--raised:#141414;--text:#fff;--text2:#ababab;--text3:#757575;--sky:#449afb;
+  --g-line:#e1e1e1;--g-head:#f8f9fa;--g-head-b:#c4c7c5;--g-sel:#e8f0fe;--g-text:#1f1f1f;--g-link:#1155cc;--g-green:#188038;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--ground);color:var(--text)}
+body{font-family:Geist,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:14px;overflow:hidden}
+a{color:var(--sky);text-decoration:none}
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);height:100vh}
+.side{background:var(--rail);border-right:1px solid var(--line-soft);padding:20px 12px;display:flex;flex-direction:column;gap:4px;min-height:0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;padding:0 8px 18px}
+.brand i{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#449afb,#0070e0)}
+.nav{display:block;padding:9px 12px;border-radius:8px;color:var(--text2);font-weight:500}
+.nav:hover{background:var(--raised);color:var(--text)}.nav[aria-current="page"]{background:var(--raised);color:var(--text);box-shadow:inset 0 0 0 1px #2a2a2a}
+.side-foot{margin-top:auto;font:12px "Geist Mono",monospace;color:var(--text3);display:grid;gap:6px;padding:0 8px}
+.side-foot a{color:var(--text3)}
+
+/* Google Sheets look */
+.sheet{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;min-height:0;background:#fff;color:var(--g-text);font-family:Roboto,Arial,sans-serif;color-scheme:light}
+.title{display:flex;align-items:center;gap:12px;padding:10px 16px 6px}
+.ico{width:24px;height:30px;border-radius:3px;background:#0f9d58;position:relative;flex:none}
+.ico::after{content:"";position:absolute;left:5px;right:5px;top:9px;bottom:6px;border:2px solid #fff;border-radius:1px;background:linear-gradient(#fff 0 0) 50%/2px 100% no-repeat,linear-gradient(#fff 0 0) 50%/100% 2px no-repeat}
+.title h1{font:400 18px "Google Sans",Roboto,Arial,sans-serif;margin:0}
+.title .sub{font-size:12px;color:#5f6368}
+.title .sp{flex:1}
+.open{font:500 13px Roboto,Arial,sans-serif;color:#fff;background:#0b57d0;padding:7px 14px;border-radius:18px;white-space:nowrap}
+.bar{display:flex;align-items:center;gap:8px;padding:6px 16px 8px;border-bottom:1px solid var(--g-head-b);flex-wrap:wrap}
+.search{display:flex;align-items:center;gap:6px;background:#edf2fa;border-radius:20px;padding:0 12px;min-width:260px}
+.search input{all:unset;padding:7px 0;font-size:13px;width:240px;color:var(--g-text)}
+.chip{all:unset;cursor:pointer;font-size:12.5px;color:#444746;border:1px solid #c4c7c5;border-radius:8px;padding:4px 10px;white-space:nowrap}
+.chip[aria-pressed="true"]{background:#d3e3fd;border-color:#d3e3fd;color:#041e49}
+.count{font-size:12.5px;color:#5f6368;margin-left:auto}
+.grid-wrap{overflow:auto;min-height:0;position:relative}
+table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fixed}
+.g th,.g td{border-right:1px solid var(--g-line);border-bottom:1px solid var(--g-line);height:21px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
+.g thead th{position:sticky;top:0;z-index:3;background:var(--g-head);color:#444746;font-weight:400;text-align:center;font-size:11.5px;border-color:var(--g-head-b)}
+.g thead tr.hdr th{top:22px;background:#fff;color:var(--g-text);font-weight:700;text-align:left;font-size:13px;border-bottom:2px solid #9aa0a6;cursor:pointer}
+.g thead tr.hdr th:hover{background:#f1f3f4}
+.g .rn{position:sticky;left:0;z-index:2;background:var(--g-head);color:#444746;text-align:center;font-size:11.5px;width:46px;border-color:var(--g-head-b)}
+.g thead .rn{z-index:4}
+.g td.c0,.g th.c0{position:sticky;left:46px;z-index:1;background:#fff;box-shadow:2px 0 0 #c4c7c5}
+.g thead th.c0{z-index:4}
+.g tbody tr:hover td{background:#f8fbff}.g tbody tr:hover td.c0{background:#f8fbff}
+.g td.sel{outline:2px solid #1a73e8;outline-offset:-2px}
+.g a{color:var(--g-link);text-decoration:underline}
+.yes{color:var(--g-green);font-weight:500}
+.tabs{display:flex;align-items:stretch;gap:2px;background:var(--g-head);border-top:1px solid var(--g-head-b);padding:0 8px;overflow-x:auto}
+.tab{all:unset;cursor:pointer;padding:8px 16px;font-size:13px;color:#444746;white-space:nowrap;border-bottom:3px solid transparent}
+.tab:hover{background:#e8eaed}
+.tab[aria-selected="true"]{background:#fff;color:#0b57d0;border-bottom-color:#0b57d0;font-weight:500}
+.tab[disabled]{color:#9aa0a6;cursor:default;background:none}
+.cellbox{padding:8px 16px;border-top:1px solid var(--g-line);font-size:12.5px;color:#444746;min-height:36px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:90px;overflow:auto;background:#fff}
+.cellbox b{color:#1f1f1f;margin-right:6px}
+.msg{padding:40px;color:#5f6368}
+@media (max-width:860px){.shell{grid-template-columns:1fr}.side{display:none}body{overflow:auto}.search{min-width:0;flex:1}.search input{width:100%}}
+</style></head><body>
+<div class="shell">
+  <nav class="side" aria-label="Views">
+    <div class="brand"><i></i>Outreach Desk</div>
+    <a class="nav" href="monitor.html">Home</a>
+    <a class="nav" href="desk.html">Reply desk</a>
+    <a class="nav" href="tracker.html" aria-current="page">Outreach Tracker</a>
+    <div class="side-foot"><span id="upd">Loading…</span><a href="#" onclick="signOut();return false">Sign out</a></div>
+  </nav>
+  <section class="sheet" aria-label="Outreach Tracker">
+    <div class="title"><span class="ico" aria-hidden="true"></span><div><h1 id="ttl">Outreach Tracker</h1><div class="sub" id="tsub"></div></div><span class="sp"></span><a class="open" id="openSheet" target="_blank" rel="noopener">Open in Google Sheets</a></div>
+    <div class="bar">
+      <label class="search"><span aria-hidden="true">⌕</span><input id="q" type="search" placeholder="Search this sheet" aria-label="Search this sheet"></label>
+      <button class="chip" data-f="replied" aria-pressed="false">Replied</button>
+      <button class="chip" data-f="sent" aria-pressed="false">Email sent</button>
+      <button class="chip" data-f="notsent" aria-pressed="false">Not sent yet</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="grid-wrap" id="wrap"><div class="msg">Loading the tracker…</div></div>
+    <div>
+      <div class="cellbox" id="cell"><b>Cell</b>Click a cell to see its full text.</div>
+      <div class="tabs" role="tablist" id="tabs"></div>
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+  const CLIENTS = [["easywebinar", "EasyWebinar", "1_0gHZv27cmvSdR9MMBJUSAv8eqo6KBOVbyRNSlkthSE"], ["versatile", "Versatile Club", "1cNGwbq32eh_7M3t3u7WN8TNu-U1fvvASmHtUu510p2Y"],
+    ["luca", "Luca", "1zdglSyUcXh6HYAFX-NGmwDeK2t_YqRYVupb1wGyE0dI"], ["oliv", "Oliv AI", "119twAtexdwBFtTzVKTbayZSt_6OyN6qzfikSv0RjCqI"],
+    ["maximuslabs", "MaximusLabs", ""], ["teamvoy", "Teamvoy", ""]];
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const col = n => { let s = ""; n++; while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  const WIDE = /url|people|notes|reason|offers/i, MID = /domain|parent|sequence|status|category|source|batch/i;
+  const st = {client: new URLSearchParams(location.search).get("c") || "easywebinar", rows: null, at: "", sort: null, f: {}, q: ""};
+  const cache = {};
+
+  function tabs() {
+    $("tabs").innerHTML = CLIENTS.map(([k, n, sid]) => `<button class="tab" role="tab" data-k="${k}" aria-selected="${k === st.client}" ${sid ? "" : "disabled title=\"No Outreach Tracker tab in this client's sheet\""}>${esc(n)}</button>`).join("");
+    document.querySelectorAll(".tab:not([disabled])").forEach(b => b.onclick = () => { st.client = b.dataset.k; history.replaceState(null, "", "?c=" + st.client); load(); });
+  }
+  async function load() {
+    tabs();
+    const c = CLIENTS.find(x => x[0] === st.client) || CLIENTS[0];
+    $("ttl").textContent = `${c[1]} · Outreach Tracker`;
+    $("openSheet").href = c[2] ? `https://docs.google.com/spreadsheets/d/${c[2]}/edit` : "#";
+    if (!cache[c[0]]) {
+      $("wrap").innerHTML = '<div class="msg">Loading the tracker…</div>';
+      await window.whenAuthed;
+      const {data, error} = await SB.from("sheet_tabs").select("rows,updated_at").eq("tab", "tracker:" + c[0]).maybeSingle();
+      if (error || !data) { $("wrap").innerHTML = `<div class="msg">${error ? esc(error.message) : "No tracker copied for this client yet."}</div>`; return; }
+      cache[c[0]] = data;
+    }
+    st.rows = cache[c[0]].rows; st.at = cache[c[0]].updated_at;
+    $("tsub").textContent = "Copied from the client's sheet · " + new Date(st.at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+    $("upd").textContent = "Updated " + new Date(st.at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+    render();
+  }
+  function render() {
+    const [head, ...body] = st.rows, ix = n => head.findIndex(h => h.toLowerCase().startsWith(n));
+    const iSent = ix("email sent"), iRep = ix("replied");
+    let list = body.map((r, i) => ({r, n: i + 2}));
+    const q = st.q.toLowerCase();
+    if (q) list = list.filter(x => x.r.join(" ").toLowerCase().includes(q));
+    if (st.f.replied && iRep >= 0) list = list.filter(x => /^y/i.test(x.r[iRep] || ""));
+    if (st.f.sent && iSent >= 0) list = list.filter(x => /^y/i.test(x.r[iSent] || ""));
+    if (st.f.notsent && iSent >= 0) list = list.filter(x => !/^y/i.test(x.r[iSent] || ""));
+    if (st.sort) { const [c, d] = st.sort; list.sort((a, b) => { const x = a.r[c] || "", y = b.r[c] || "", nx = parseFloat(x), ny = parseFloat(y);
+      return (!isNaN(nx) && !isNaN(ny) ? nx - ny : x.localeCompare(y)) * d; }); }
+    const w = head.map(h => WIDE.test(h) ? 260 : MID.test(h) ? 160 : 120);
+    const cell = (v, ci) => { v = v ?? ""; const s = String(v);
+      const html = /^https?:\/\//.test(s) && !/\s/.test(s) ? `<a href="${esc(s)}" target="_blank" rel="noopener">${esc(s)}</a>` : (/^yes$/i.test(s) ? `<span class="yes">${esc(s)}</span>` : esc(s));
+      return `<td class="${ci === 0 ? "c0" : ""}" data-c="${ci}" title="${esc(s)}">${html}</td>`; };
+    $("wrap").innerHTML = `<table class="g" style="width:${46 + w.reduce((a, b) => a + b, 0)}px"><colgroup><col style="width:46px">${w.map(x => `<col style="width:${x}px">`).join("")}</colgroup>
+      <thead><tr><th class="rn"></th>${head.map((h, i) => `<th class="${i === 0 ? "c0" : ""}">${col(i)}</th>`).join("")}</tr>
+      <tr class="hdr"><th class="rn">1</th>${head.map((h, i) => `<th class="${i === 0 ? "c0" : ""}" data-sort="${i}" title="Sort by ${esc(h)}">${esc(h)}${st.sort && st.sort[0] === i ? (st.sort[1] > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead>
+      <tbody>${list.map(x => `<tr><td class="rn">${x.n}</td>${head.map((_, ci) => cell(x.r[ci], ci)).join("")}</tr>`).join("")}</tbody></table>`;
+    $("count").textContent = `${list.length} of ${body.length} rows`;
+    document.querySelectorAll("[data-sort]").forEach(th => th.onclick = () => { const c = +th.dataset.sort; st.sort = st.sort && st.sort[0] === c ? (st.sort[1] > 0 ? [c, -1] : null) : [c, 1]; render(); });
+    $("wrap").querySelector("tbody").onclick = e => { const td = e.target.closest("td[data-c]"); if (!td || e.target.tagName === "A") return;
+      document.querySelectorAll("td.sel").forEach(x => x.classList.remove("sel")); td.classList.add("sel");
+      const rn = td.parentElement.firstElementChild.textContent; $("cell").innerHTML = `<b>${col(+td.dataset.c)}${rn} · ${esc(head[+td.dataset.c])}</b>${esc(td.title)}`; };
+  }
+  $("q").oninput = e => { st.q = e.target.value; render(); };
+  document.querySelectorAll(".chip").forEach(b => b.onclick = () => { st.f[b.dataset.f] = !st.f[b.dataset.f]; if (b.dataset.f === "sent" && st.f.sent) st.f.notsent = false; if (b.dataset.f === "notsent" && st.f.notsent) st.f.sent = false;
+    document.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", !!st.f[x.dataset.f])); render(); });
+  load();
+})();
+</script>
+</body></html>
