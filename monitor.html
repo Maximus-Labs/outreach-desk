@@ -387,19 +387,11 @@ table.led td.muted { color: var(--text3) }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
+<script src="shell.js"></script>
 </head>
 <body>
 <div class="shell">
-  <nav class="side" aria-label="Views">
-    <div class="brand"><i aria-hidden="true"></i>Outreach Desk</div>
-    <div class="navlist" id="nav">
-      <a href="monitor.html" class="navbtn" id="nav-home"><span>Home</span></a>
-      <a href="desk.html" class="navbtn"><span>Reply desk</span></a>
-      <a href="tracker.html" class="navbtn"><span>Outreach Tracker</span></a>
-      <span class="label navgroup">Clients</span>
-    </div>
-    <div class="side-foot"><div id="updated">Loading…</div><a href="#" onclick="signOut();return false" style="color:var(--text3)">Sign out</a></div>
-  </nav>
+  <nav class="sb" id="sb" aria-label="Views"></nav>
 
   <main class="wrap">
     <div id="banner" class="banner" hidden></div>
@@ -619,7 +611,7 @@ table.led td.muted { color: var(--text3) }
       }))));
   }
 
-  function nav(d) {
+  function nav(d) { return;  // the shared sidebar (shell.js) draws the navigation
     const box = $("nav");
     for (const c of d.clients) box.append(el("a", { href: "monitor.html?c=" + c.slug, class: "navbtn", "aria-current": MODE === "client" && c.slug === SLUG ? "page" : null },
       el("span", { text: c.name }), c.placeholder ? null : el("b", { class: "count" + (c.needs_reply ? "" : " zero"), title: "Needs our reply", text: String(c.needs_reply || 0) })));
@@ -999,5 +991,6 @@ table.led td.muted { color: var(--text3) }
     .catch(() => { const b = $("banner"); b.textContent = "The dashboard data couldn't be loaded. Refresh the page; if it keeps failing, ask the team."; b.className = "banner err"; b.hidden = false; });
 })();
 </script>
+<script>Shell.mount("monitoring", new URLSearchParams(location.search).get("c") || "");</script>
 </body>
 </html>

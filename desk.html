@@ -3,30 +3,19 @@
 <title>Outreach Desk · Reply desk</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
+<script src="shell.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="desk.css">
 </head><body>
 <div class="app" id="app">
   <!-- 1. Sidebar: home + clients -->
-  <nav class="side" aria-label="Clients">
-    <div class="brand"><span class="mark"></span><span class="lbl">Outreach Desk</span></div>
-    <a class="nav-item" href="monitor.html"><span class="ini">◎</span><span class="lbl">Monitor</span></a>
-    <a class="nav-item" href="tracker.html"><span class="ini">▦</span><span class="lbl">Outreach Tracker</span></a>
-    <button class="nav-item" id="navHome" data-k=""><span class="ini">⌂</span><span class="lbl">Home</span><span class="badge" id="homeBadge"></span></button>
-    <div class="side-h lbl">Clients</div>
-    <div id="clientNav"></div>
-    <div class="side-foot">
-      <div class="worker" id="worker"><span class="dot"></span><span class="lbl" id="workerTxt">Checking…</span></div>
-      <div class="upd-line lbl" id="updated"></div>
-      <div class="foot-btns lbl"><button class="btn sm" id="pullAll">Pull all</button><button class="btn sm ghost" id="openKnow">Rules</button><button class="btn sm ghost" onclick="signOut()">Sign out</button></div>
-    </div>
-  </nav>
+  <nav class="sb" id="sb" aria-label="Views"></nav>
 
   <!-- 2. Reply queue -->
   <section class="queue" aria-label="Reply queue">
     <header class="q-head">
       <div><h1 id="qTitle">All clients</h1><div class="q-sub" id="qSub"></div></div>
-      <button class="icon-btn" id="pullOne" title="Pull this client from Gmail" aria-label="Pull from Gmail">↻</button>
+      <span class="q-tools"><button class="icon-btn" id="openKnow" title="Rules and decision log" aria-label="Rules and decision log">≡</button><button class="icon-btn" id="pullOne" title="Pull this client from Gmail" aria-label="Pull from Gmail">↻</button></span>
     </header>
     <label class="q-search"><span aria-hidden="true">⌕</span><input id="qSearch" type="search" placeholder="Search name, company, subject…" aria-label="Search the queue"><button id="qClear" hidden aria-label="Clear search">✕</button></label>
     <div class="q-tabs" id="qTabs" role="tablist" aria-label="Thread status"></div>

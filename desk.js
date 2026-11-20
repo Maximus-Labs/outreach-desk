@@ -68,8 +68,7 @@ async function tick() {
   try {
     const j = await api("/api/jobs");
     S.online = j.worker_online;
-    $("#worker").className = "worker " + (j.worker_online ? "on" : "off");
-    $("#workerTxt").textContent = (j.worker_online ? "Claude online" : "Claude offline") + (j.pending ? ` · ${j.pending} queued` : "");
+    window.__claudeOnline = j.worker_online;
     const next = {}; j.jobs.forEach(x => next[x.thread_id] = x);
     for (const x of j.jobs) {
       const was = S.jobs[x.thread_id];
@@ -81,25 +80,14 @@ async function tick() {
     await loadSide(); await loadQueue();
     if (S.sel) { const jb = S.jobs[S.sel.tid]; const sig = jb ? jb.id + jb.status : "none";
       if (sig !== S.threadSig || (S.thread && S.thread.loading)) openThread(S.sel.key, S.sel.tid, true); }
-  } catch (e) { $("#worker").className = "worker off"; $("#workerTxt").textContent = "Desk server offline"; }
+  } catch (e) {}
 }
 
 // ---------------- sidebar ----------------
 async function loadSide() {
-  const o = await api("/api/overview"); S.overview = o;
-  const total = o.clients.reduce((a, c) => a + c.reply, 0);
-  $("#homeBadge").textContent = total; $("#homeBadge").classList.toggle("zero", !total);
-  $("#navHome").setAttribute("aria-current", S.client === "");
-  $("#clientNav").innerHTML = o.clients.map(c => `
-    <button class="nav-item" data-k="${esc(c.key)}" aria-current="${S.client === c.key}" title="${esc(c.name)} · ${c.reply} need our reply (${c.followup} follow-ups) · ${c.others} other threads">
-      <span class="ini" style="background:${esc(c.color)}22;color:${esc(c.color)}">${esc(initials(c.name))}</span>
-      <span class="lbl">${esc(c.name)}</span>${c.pulling ? '<span class="spin" style="color:var(--sky)"></span>' : ""}
-      
-      <span class="badge ${c.reply ? "" : "zero"}">${c.reply}</span></button>`).join("");
-  document.querySelectorAll("#clientNav .nav-item").forEach(b => b.onclick = () => pickClient(b.dataset.k));
-  $("#updated").textContent = o.updated ? "Updated " + new Date(o.updated).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}) : "Not pulled yet";
+  const o = await api("/api/overview"); S.overview = o;   // the sidebar itself is drawn by shell.js
 }
-function pickClient(k) { S.client = k; $("#app").classList.remove("reading"); loadSide(); loadQueue(); }
+function pickClient(k) { S.client = k; $("#app").classList.remove("reading"); if (window.Shell) Shell.setClient(k); loadSide(); loadQueue(); }
 
 // ---------------- queue ----------------
 async function loadQueue() {
@@ -198,34 +186,43 @@ function renderWork() {
 }
 
 function renderComposer() {
+  // Two clear blocks: 1) the reply itself (who, to, subject, text, actions) 2) "Ask Claude to change it" with suggestions.
   const box = $("#composer"); if (!box) return;
   const t = S.thread, j = S.jobs[S.sel.tid] || t.job, r = j && j.result;
-  const c = S.overview.clients.find(x => x.key === S.sel.key) || {};
-  const helper = btn => `<div class="gm-help"><span class="gm-spark" aria-hidden="true">✦</span>
-      <input id="instr" placeholder="Tell Claude what to change, e.g. accept 1:1, offer our webcast article, keep it short" aria-label="Instruction for Claude">
-      <button class="gm-help-btn" id="go">${btn}</button></div>`;
-  const shell = inner => `<div class="gm-reply-row"><span class="gm-av" style="background:${esc(c.color)}">${esc(initials(c.name).slice(0, 1))}</span><div class="gm-reply">${inner}</div></div>`;
+  const meta = t.meta || {}, partner = nameOf(meta.partner || "") || meta.to || "them";
+  const subj = "Re: " + (t.subject || "").replace(/^(re:\s*)+/i, "");
+  const ask = (btn, withSugs) => `<section class="ai-card" aria-label="Ask Claude to change the draft">
+      <div class="ai-h"><span class="gm-spark" aria-hidden="true">✦</span><b>${btn === "Draft" ? "Ask Claude to write the reply" : "Ask Claude to change this draft"}</b></div>
+      <p class="ai-hint">${btn === "Draft" ? "Leave it empty for the obvious reply, or say what you want." : "Say what to change. Claude rewrites it; you can work on other emails meanwhile."}</p>
+      <div class="ai-row"><input id="instr" placeholder="e.g. accept 1:1, offer our webcast article, make it shorter" aria-label="Instruction for Claude"><button class="ai-go" id="go">${btn}</button></div>
+      ${withSugs && (r.suggestions || []).length ? `<div class="ai-sugs"><div class="ai-sl">Suggestions</div>${r.suggestions.map(s => `<button class="gm-schip">${esc(s)}</button>`).join("")}</div>` : ""}
+    </section>`;
   if (j && /^(working|sending)/.test(j.status)) {
-    box.innerHTML = shell(`<div class="gm-wait"><span class="spin"></span> ${j.status === "sending" ? "Sending…" : "Claude is drafting"}${j.instruction ? ` · “${esc(j.instruction)}”` : ""}. Move on to the next email; you'll get a toast.</div>`); return;
+    box.innerHTML = `<section class="dr-card"><div class="dr-wait"><span class="spin"></span><div><b>${j.status === "sending" ? "Sending…" : "Claude is drafting"}</b>
+      <div>${j.instruction ? `“${esc(j.instruction)}” · ` : ""}Move on to the next email; you'll get a note when it's ready.</div></div></div></section>`; return;
   }
   if (!r || (r.category === "no-reply-needed" && !r.draft_body)) {
-    box.innerHTML = shell(`<div class="gm-rh"><span class="gm-rh-ico">↩</span><span class="gm-chip">${esc((t.meta || {}).to || "")}</span></div>
-      <div class="gm-empty">${r ? esc(r.summary) : "No draft yet. Give Claude an instruction, or leave it empty for the obvious reply."}</div>
-      ${helper("Draft")}
-      <div class="gm-foot"><span class="sp"></span>${r ? "" : `<button class="gm-txt" id="skip" title="Skip, no reply">Skip, no reply</button>`}</div>`);
+    box.innerHTML = `<section class="dr-card"><div class="dr-head"><div><div class="dr-title">${r ? "No reply needed" : "No draft yet"}</div>
+        <div class="dr-sub">To ${esc(meta.to || partner)} · from ${esc(t.mailbox || "")}</div></div>
+        ${r ? "" : `<button class="dr-txt" id="skip">Skip, no reply</button>`}</div>
+        ${r ? `<p class="dr-note">${esc(r.summary)}</p>` : ""}</section>${ask("Draft", false)}`;
   } else {
-    box.innerHTML = ((r.suggestions || []).length ? `<div class="gm-smart">${r.suggestions.map(s => `<button class="gm-schip">${esc(s)}</button>`).join("")}</div>` : "")
-      + shell((j.outdated ? `<div class="gm-warn">A new email arrived after this draft was written. Press Redraft, or Claude redrafts it on the next run.</div>` : "")
-      + `<div class="gm-rh"><span class="gm-rh-ico">↩</span><span class="gm-to-l">To</span><input class="gm-to-in" id="to" value="${esc(j.to || (t.meta || {}).to || "")}" aria-label="To">
-          <span class="gm-meta">${esc(r.category)}${j.auto ? " · auto" : ""}</span></div>
-        <textarea class="gm-ta" id="body" spellcheck="true" aria-label="Reply">${esc(r.draft_body)}</textarea>
-        ${helper("Redraft")}
-        <div class="gm-foot"><button class="gm-send" id="send">Send</button><button class="gm-txt" id="gdraft">Save to Gmail</button><span class="sp"></span>
-          <button class="gm-txt gm-del" id="skip" title="Skip, no reply">Skip, no reply</button></div>`);
+    box.innerHTML = `<section class="dr-card" aria-label="Reply">
+        ${j.outdated ? `<div class="dr-warn">A new email arrived after this draft was written. Ask Claude to redraft it below.</div>` : ""}
+        <div class="dr-head"><div><div class="dr-title">Reply to ${esc(partner)}</div>
+          <div class="dr-sub">from ${esc(t.mailbox || "")} · <span class="dr-cat">${esc(r.category)}</span>${j.auto ? " · drafted automatically" : ""}</div></div></div>
+        <div class="dr-fields">
+          <label class="dr-row"><span>To</span><input id="to" value="${esc(j.to || meta.to || "")}" aria-label="To"></label>
+          <div class="dr-row"><span>Subject</span><div class="dr-subj">${esc(subj)}</div></div>
+        </div>
+        <textarea class="dr-body" id="body" spellcheck="true" aria-label="Reply text">${esc(r.draft_body)}</textarea>
+        <div class="dr-actions"><button class="gm-send" id="send">Send</button><button class="dr-txt" id="gdraft">Save to Gmail</button>
+          <span class="sp"></span><button class="dr-txt dr-skip" id="skip">Skip, no reply</button></div>
+      </section>${ask("Redraft", true)}`;
     $("#send").onclick = () => confirmSend();
     $("#gdraft").onclick = () => act("save-draft", {to: $("#to").value, subject: t.subject, body: $("#body").value, mailbox: t.mailbox}, "Saving to Gmail drafts");
     box.querySelectorAll(".gm-schip").forEach(b => b.onclick = () => { $("#instr").value = b.textContent; $("#instr").focus(); });
-    const ta = $("#body"); ta.style.height = Math.max(180, ta.scrollHeight + 4) + "px";
+    const ta = $("#body"); ta.style.height = Math.max(240, ta.scrollHeight + 6) + "px";
   }
   const sk = $("#skip"); if (sk) sk.onclick = () => act("skip", {reason: ($("#instr") || {}).value || ""}, "Skipped and logged");
   const go = $("#go"), inp = $("#instr");
@@ -300,11 +297,11 @@ async function openKnow() {
 $("#qSearch").oninput = e => { S.search = e.target.value; $("#qClear").hidden = !S.search; loadQueue(); };
 $("#qSearch").onkeydown = e => { if (e.key === "Escape") { e.target.value = ""; S.search = ""; $("#qClear").hidden = true; loadQueue(); } };
 $("#qClear").onclick = e => { e.preventDefault(); $("#qSearch").value = ""; S.search = ""; $("#qClear").hidden = true; loadQueue(); $("#qSearch").focus(); };
-$("#navHome").onclick = () => pickClient("");
 $("#openKnow").onclick = openKnow;
-$("#pullAll").onclick = async () => { await api("/api/refresh-all", {}); toast("Pull queued for all clients"); };
 $("#pullOne").onclick = async () => {
   if (!S.client) { await api("/api/refresh-all", {}); toast("Pull queued for all clients"); return; }
   await api(`/api/clients/${S.client}/refresh`, {}); toast("Pull queued");
 };
+S.client = new URLSearchParams(location.search).get("c") || "";
+Shell.mount("reply", S.client, k => pickClient(k));
 tick(); setInterval(tick, 3500);
