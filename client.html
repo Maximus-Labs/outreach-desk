@@ -21,7 +21,7 @@ a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline} a:fo
 .head small{color:var(--text3);font-size:12.5px}
 .badge{font:12px var(--mono);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);border-radius:999px;padding:4px 10px;white-space:nowrap}
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.otag{display:block;margin-top:3px;font:11.5px/1.35 var(--body)} .otag.us{color:var(--yes)} .otag.co{color:var(--acc)} .otag.client{color:var(--wip)}
+.otag{display:inline-block;white-space:nowrap;font:12.5px/1.35 var(--body)} #ex td.led{border-right:1px solid var(--line)} .otag.us{color:var(--yes)} .otag.co{color:var(--acc)} .otag.client{color:var(--wip)}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:4px;align-content:start}
 .kpi span{font-size:13px;color:var(--text2)} .kpi b{font:500 38px/1.05 var(--mono);font-variant-numeric:tabular-nums} .kpi small{font-size:12px;color:var(--text3)}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
@@ -35,10 +35,10 @@ svg text{font-family:var(--mono);font-size:10.5px;fill:var(--text3)}
   .scroll table, .scroll tbody, .scroll tr, .scroll td{display:block;width:auto}
   .scroll thead{display:none}
   .scroll tr{padding:10px 2px;border-bottom:1px solid var(--line)} .scroll tr:last-child{border-bottom:0}
-  .scroll td{border:0;padding:2px 0} .scroll td:first-child{font-weight:600} #ex td.p{background:none;border:0;padding:6px 0 2px} #ex tr{border-bottom:0;padding:6px 2px} #ex tr.g0{border-top:1px solid var(--line)} #ex tr.g0 td{border-top:0} #ex tr.g0:first-child{border-top:0} #ex td.d{font-weight:400}
+  .scroll td{border:0;padding:2px 0} .scroll td:first-child{font-weight:600} #ex td.p{background:none;border:0;padding:6px 0 2px} #ex td.led{border:0;padding:2px 0} #ex tr{border-bottom:0;padding:6px 2px} #ex tr.g0{border-top:1px solid var(--line)} #ex tr.g0 td{border-top:0} #ex tr.g0:first-child{border-top:0} #ex td.d{font-weight:400}
   .scroll td[data-l]::before{content:attr(data-l);display:block;font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:6px}
 }
-.scroll th:nth-child(1){width:18%} .scroll th:nth-child(2){width:13%} .scroll th:nth-child(3),.scroll th:nth-child(4){width:34.5%} td.p{border-right:1px solid var(--line);background:var(--raised,#18181a)} td.p b{display:block;font-weight:600} td.p small{display:block;margin-top:3px;font:12px var(--mono);color:var(--text3)} #ex tr.g0 td{border-top:1px solid var(--line)} .scroll thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+.scroll th:nth-child(1){width:16%} .scroll th:nth-child(2){width:13%} .scroll th:nth-child(3){width:11%} .scroll th:nth-child(4),.scroll th:nth-child(5){width:30%} td.p{border-right:1px solid var(--line);background:var(--raised,#18181a)} td.p b{display:block;font-weight:600} td.p small{display:block;margin-top:3px;font:12px var(--mono);color:var(--text3)} #ex tr.g0 td{border-top:1px solid var(--line)} .scroll thead th{position:sticky;top:0;background:var(--surface);z-index:1}
 table{width:100%;border-collapse:collapse;font-size:13.5px} th{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
 td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top} tr:last-child td{border-bottom:0}
 td.d{font-family:var(--mono);white-space:nowrap;color:var(--text2)}
@@ -55,7 +55,7 @@ td.d{font-family:var(--mono);white-space:nowrap;color:var(--text2)}
   <div class="kpi"><span>Exchanges</span><b id="k3">–</b><small id="k3s"></small></div>
 </div>
 <section class="panel" aria-labelledby="h-act"><div class="ph"><h2 id="h-act">Daily activity</h2><div class="legend"><span><i style="background:var(--acc)"></i>Emails sent</span><span><i style="background:var(--yes)"></i>Replies</span></div></div><div id="chart"></div></section>
-<section class="panel" aria-labelledby="h-ex"><div class="ph"><h2 id="h-ex">Live exchanges</h2><span id="ex-note">Both pages published</span></div><div class="scroll" id="ex-wrap"><table><thead><tr><th>Partner</th><th>Date</th><th>Their page (lists you)</th><th>Your page (lists them)</th></tr></thead><tbody id="ex"></tbody></table></div></section>
+<section class="panel" aria-labelledby="h-ex"><div class="ph"><h2 id="h-ex">Live exchanges</h2><span id="ex-note">Both pages published</span></div><div class="scroll" id="ex-wrap"><table><thead><tr><th>Partner</th><th>Led by</th><th>Date</th><th>Their page (lists you)</th><th>Your page (lists them)</th></tr></thead><tbody id="ex"></tbody></table></div></section>
 <section class="panel" aria-labelledby="h-cv"><div class="ph"><h2 id="h-cv">Conversations</h2><span>Companies discussing an exchange</span></div><div class="wrap"><table><thead><tr><th>Company</th><th>Status</th><th>Last update</th></tr></thead><tbody id="cv"></tbody></table></div></section>
 <p class="foot">Prepared by MaximusLabs. Updated twice a day, at about 9:10 and 15:10 IST.<span id="back"></span> · <a href="#" id="out">Sign out</a></p>
 </main>
@@ -108,11 +108,11 @@ function render(c) {
   groups.forEach(g => g.rows.sort((a, b) => (a.live || "").localeCompare(b.live || "")));
   groups.sort((a, b) => b.rows.length - a.rows.length || (b.rows.at(-1).live || "").localeCompare(a.rows.at(-1).live || ""));
   $("ex").replaceChildren(...(groups.length ? groups.flatMap(g => g.rows.map((x, i) => el("tr", { class: i ? "" : "g0" },
-      i ? null : el("td", { class: "p", rowspan: String(g.rows.length) }, el("b", { text: g.p }), el("small", { text: `${g.rows.length} exchange${g.rows.length > 1 ? "s" : ""}` }),
-        ORIGIN[g.rows[0].origin] ? el("small", { class: `otag ${ORIGIN[g.rows[0].origin][1]}`, text: ORIGIN[g.rows[0].origin][0], title: ORIGIN[g.rows[0].origin][2] }) : null),
+      i ? null : el("td", { class: "p", rowspan: String(g.rows.length) }, el("b", { text: g.p }), el("small", { text: `${g.rows.length} exchange${g.rows.length > 1 ? "s" : ""}` })),
+      i ? null : el("td", { class: "led", rowspan: String(g.rows.length), "data-l": "Led by" }, ORIGIN[g.rows[0].origin] ? el("span", { class: `otag ${ORIGIN[g.rows[0].origin][1]}`, text: ORIGIN[g.rows[0].origin][0], title: ORIGIN[g.rows[0].origin][2] }) : "–"),
       el("td", { class: "d", "data-l": "Date", text: x.live ? pretty(x.live) : (x.month || "") }),
       el("td", { "data-l": "Their page (lists you)" }, link(x.their_url)), el("td", { "data-l": "Your page (lists them)" }, link(x.our_url)))))
-    : [el("tr", {}, el("td", { colspan: "4", class: "empty", text: "None yet. Exchanges appear here once both pages are published." }))]));
+    : [el("tr", {}, el("td", { colspan: "5", class: "empty", text: "None yet. Exchanges appear here once both pages are published." }))]));
   requestAnimationFrame(() => {   // show five exchanges; scroll for the rest
     const w = $("ex-wrap"), rs = [...w.querySelectorAll("tbody tr")];
     if (rs.length > 5) { w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs.slice(0, 5).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px"; $("ex-note").textContent = `${rs.length} live with ${groups.length} partners · scroll for more`; }
