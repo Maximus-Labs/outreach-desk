@@ -99,6 +99,7 @@ dd.hot { color: var(--sky) }
 .types span { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .02em; color: var(--text3); white-space: nowrap }
 .types .t-paid b { color: var(--warn) }
 .types .t-partnership b { color: var(--sky) }
+.otag { display: block; margin-top: 3px; font-size: 11.5px; line-height: 1.35 } .otag.us { color: var(--good) } .otag.client { color: var(--warn) }
 .queue.type-exchange > header { box-shadow: inset 3px 0 0 var(--good) }
 .queue.type-paid > header { box-shadow: inset 3px 0 0 var(--warn) }
 .queue.type-partnership > header { box-shadow: inset 3px 0 0 var(--sky) }
@@ -875,13 +876,16 @@ table.led td.muted { color: var(--text3) }
   const DR = {"aimers.io": 50, "airmeet.com": 78, "albato.com": 73, "ampup.ai": 29, "asanify.com": 55, "atlashxm.com": 55, "citant.ai": 29, "cleverly.co": 64, "clixiemedia.com": 18, "coldreach.ai": 43, "concurate.com": 43, "conjura.com": 50, "coworker.ai": 60, "cuoral.com": 7, "discoveredlabs.com": 66, "dreamcast.co": 53, "dupple.com": 59, "elearningsolutionslab.com": 33, "emergent.sh": 86, "equinetacademy.com": 50, "eventify.io": 69, "flexhire.com": 10, "getmaxiq.com": 46, "gloroots.com": 40, "goairspeed.com": 52, "grouglobal.com": 32, "group.app": 64, "guideflow.com": 65, "heystream.com": 44, "improvado.io": 77, "inflopartners.com": 28, "intervue.io": 43, "kanerika.com": 65, "leadjourney.io": 35, "lebesgue.io": 66, "meetyoo.com": 62, "mercans.com": 49, "mindtickle.com": 74, "ness.com": 71, "omnihr.co": 56, "omnivoo.com": 21, "onestream.live": 72, "oysterhr.com": 72, "pickaxeproject.com": 61, "playroll.com": 60, "proprofs.com": 80, "reverbico.com": 70, "revspire.io": 39, "ruzuku.com": 72, "salesforge.ai": 72, "saleshandy.com": 76, "searcheye.io": 41, "shorpay.com": 40, "sparkup.app": 49, "syncgtm.com": 55, "teamed.global": 57, "thimpress.com": 87, "twominutereports.com": 63, "txtcart.ai": 65, "velaris.io": 51, "viasocket.com": 76, "wbcomdesigns.com": 79, "webinarninja.com": 75, "zapier.com": 92};   // Domain Rating by Ahrefs, per domain
   const drOf = d => { const v = DR[String(d || "").toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]]; return v == null ? "–" : String(v); };
   const drCell = (d, extra = {}) => el("td", { class: "dr num", ...extra }, el("span", { class: "drv", text: drOf(d) }));
+  // Who started the exchange (sync.py adds `origin` from exchange_origin.json): us, or the client's team then us.
+  const originTag = x => x.origin === "us" ? el("small", { class: "otag us", text: "By MaximusLabs" })
+    : x.origin === "client" ? el("small", { class: "otag client", text: `Started by ${x._c || "client"} · finished by MaximusLabs` }) : null;
   // Exchanges one per pair of pages (a sheet cell may hold several links, one per line), grouped by partner:
   // partners with the most exchanges first, then the newest.
   const exPairs = c => {
     const urls = v => String(v || "").split(/\n+/).map(u => u.trim()).filter(Boolean);
     const out = [];
     for (const x of c.exchanges || []) { const t = urls(x.their_url), o = urls(x.our_url), n = Math.max(1, t.length, o.length);
-      for (let i = 0; i < n; i++) out.push({ ...x, their_url: t[i] || "", our_url: o[i] || "" }); }
+      for (let i = 0; i < n; i++) out.push({ ...x, their_url: t[i] || "", our_url: o[i] || "", _c: c.name }); }
     const by = new Map(); for (const x of out) { if (!by.has(x.partner)) by.set(x.partner, []); by.get(x.partner).push(x); }
     const gs = [...by.values()].map(g => g.sort((a, b) => (a.live || "").localeCompare(b.live || "")));
     gs.sort((a, b) => b.length - a.length || (b.at(-1).live || "").localeCompare(a.at(-1).live || ""));
@@ -891,7 +895,7 @@ table.led td.muted { color: var(--text3) }
     { key: "completed", label: "Completed", hint: "Each partner, the page that lists us, and the page where we listed them.",
       head: ["Partner", "DR", "Their page (lists us)", "Our page (lists them)", "Live since"], empty: "No completed link exchanges yet.",
       rows: exPairs, row: x => [x._i ? null : el("td", { class: "partner pgrp", rowspan: String(x._n) }, el("span", { text: x.partner }),
-          x._n > 1 ? el("small", { text: `${x._n} exchanges` }) : null), x._i ? null : drCell(x.partner, { rowspan: String(x._n) }),
+          x._n > 1 ? el("small", { text: `${x._n} exchanges` }) : null, originTag(x)), x._i ? null : drCell(x.partner, { rowspan: String(x._n) }),
         el("td", { class: "url" }, link(x.their_url), x.their_date ? el("small", { text: x.their_date }) : null),
         el("td", { class: "url" }, link(x.our_url), x.our_date ? el("small", { text: x.our_date }) : null),
         el("td", { class: "when num", text: x.live || "Earlier" })] },
