@@ -419,12 +419,17 @@ function renderChat() {
   const log = (S.chat || []).filter(m => m.thread_id === tid);
   const open = (S.reqs || []).filter(r => r.type === "chat" && (r.thread_id === tid || (r.payload || {}).thread_id === tid));
   for (let i = pendingChat.length - 1; i >= 0; i--) if (log.some(m => m.q === pendingChat[i].q) || open.some(r => (r.payload || {}).text === pendingChat[i].q)) pendingChat.splice(i, 1);
-  const items = [];
-  log.forEach((m, i) => { items.push(`<div class="bub me">${esc(m.q)}</div>`);
+  const items = [], sentAt = t => t ? new Date(t).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}) : "";
+  log.forEach((m, i) => { items.push(`<div class="bub me">${esc(m.q)}<span class="qs done">✓ Answered · ${sentAt(m.at_a)}</span></div>`);
     items.push(`<div class="bub ai">${esc(m.a)}<button class="use" data-i="${i}">Redraft the reply with this</button></div>`); });
-  open.forEach(r => items.push(`<div class="bub me">${esc((r.payload || {}).text)}</div>`));
-  pendingChat.filter(p => p.tid === tid).forEach(p => items.push(`<div class="bub me">${esc(p.q)}</div>`));
-  if (open.length || pendingChat.some(p => p.tid === tid)) items.push(`<div class="bub w">${S.online ? "Claude is answering…" : "Claude is offline; answered at the next desk run (7:25 / 1:25)."}</div>`);
+  // each open question shows where it is: sending → sent → Claude working → (answer appears above)
+  const stateOf = r => r.status === "received" ? ["work", "Claude is working on it"]
+    : S.online ? ["work", "Claude is reading your question"] : ["wait", "Sent · waiting for Claude to start"];
+  open.forEach(r => { const [k, txt] = stateOf(r);
+    items.push(`<div class="bub me">${esc((r.payload || {}).text)}<span class="qs ${k}">${k === "work" ? '<span class="dots"><i></i><i></i><i></i></span>' : '<span class="clk"></span>'}${txt} · ${sentAt(r.created_at)}</span></div>`); });
+  pendingChat.filter(p => p.tid === tid).forEach(p => items.push(`<div class="bub me">${esc(p.q)}<span class="qs wait"><span class="spin"></span>Sending to Claude…</span></div>`));
+  if (open.some(r => r.status !== "received") && !S.online)
+    items.push(`<div class="bub w">Claude isn't running on the office PC right now, so the answer comes at the next desk run (7:25 / 1:25) or when someone starts a desk session. Your question is saved.</div>`);
   if (!items.length) items.push(`<div class="hint">Ask about this partner, their pages or what to reply. Claude answers here, and one click turns the answer into a new draft.</div>`);
   const atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
   box.innerHTML = items.join("");
