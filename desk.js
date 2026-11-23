@@ -365,9 +365,11 @@ function renderCtx() {
       <div class="pg">${theirPage ? `<span>Their page</span><a href="${esc(href(theirPage))}" target="_blank" rel="noopener noreferrer">${esc(theirPage)}</a>` : ""}
         ${m["Our page (where partner goes)"] ? `<span>Our page</span><a href="${esc(href(m["Our page (where partner goes)"]))}" target="_blank" rel="noopener noreferrer">${esc(m["Our page (where partner goes)"])}</a>` : ""}</div>
       <div class="asof">From the client sheet · ${esc([m["Date checked"], m["Source"]].filter(Boolean).join(" · ") || "date not logged")}</div>`;
-  } else {
+  } else {  // new or unchecked partner: same table, dashes until the numbers are logged
     cmp = (r.needs_user_decision && r.decision_question ? `<div class="verdict check"><b>Check before sending</b>${esc(r.decision_question)}</div>` : "") +
-      `<p class="none">Not checked yet. No row for ${esc(dom || "this partner")} in the client's “Ahrefs – Partner Checks” sheet.</p>`;
+      `<table class="cmp"><thead><tr><th></th><th>Their page</th><th>Our page</th></tr></thead><tbody>
+       ${["Domain rating", "Traffic / mo", "AI visibility"].map(l => `<tr><td>${l}</td><td>–</td><td>–</td></tr>`).join("")}</tbody></table>
+       <div class="asof">Not checked yet · no row for ${esc(dom || "this partner")} in the client's “Ahrefs – Partner Checks” sheet</div>`;
   }
   // 2 · recap
   const tl = b.timeline || [];
