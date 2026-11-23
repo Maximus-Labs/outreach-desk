@@ -999,14 +999,14 @@ table.led td.muted { color: var(--text3) }
     .then(({ data }) => {
       const d = data.rows;
       const when = d.updated ? `Updated ${d.updated} IST` : "";
-      $("updated").textContent = when; $("client-updated").textContent = when; $("home-updated").textContent = when;
+      for (const id of ["updated", "client-updated", "home-updated"]) { const n = $(id); if (n) n.textContent = when; }
       nav(d);
       if (MODE === "team") return renderTeam(d);
       const c = d.clients.find(x => x.slug === SLUG);
       if (!c) throw new Error("no client");
       renderClient({ client: c, updated: d.updated });
     })
-    .catch(e => { console.warn("Monitoring data:", e && e.message); const b = $("banner"); b.textContent = "The dashboard data couldn't be loaded. Refresh the page; if it keeps failing, ask the team."; b.className = "banner err"; b.hidden = false; });
+    .catch(e => { console.warn("Monitoring data:", e && e.message, e && e.stack); const b = $("banner"); b.textContent = "The dashboard data couldn't be loaded. Refresh the page; if it keeps failing, ask the team."; b.className = "banner err"; b.hidden = false; });
 })();
 </script>
 <script>Shell.mount("monitoring", new URLSearchParams(location.search).get("c") || "");</script>
