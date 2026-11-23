@@ -120,7 +120,7 @@ function render(c) {
     : [el("tr", {}, el("td", { colspan: "5", class: "empty", text: "None yet. Exchanges appear here once both pages are published." }))]));
   requestAnimationFrame(() => {   // show five exchanges; scroll for the rest
     const w = $("ex-wrap"), rs = [...w.querySelectorAll("tbody tr")];
-    if (rs.length > 5) { w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs.slice(0, 5).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px"; $("ex-note").textContent = `${rs.length} live with ${groups.length} partners · scroll for more`; }
+    if (rs.length > 5) { w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs.slice(0, 5).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px"; $("ex-note").textContent = `${rs.length} live with ${groups.length} partners${c.exchanges.some(x => ORIGIN[x.origin]) ? ` (Client-led ${cnt("client_only")} · Co-led ${cnt("client")} · MaximusLabs-led ${cnt("us")})` : ""} · scroll for more`; }
   });
   $("cv").replaceChildren(...(c.conversations.length ? c.conversations.map(x => el("tr", {}, el("td", { text: x.company }), el("td", {}, el("span", { class: "pill " + (x.status === "Agreed" ? "yes" : "wip"), text: x.status })), el("td", { class: "d", text: x.last_at ? short(x.last_at) : "" })))
     : [el("tr", {}, el("td", { colspan: "3", class: "empty", text: "No conversations open right now." }))]));
