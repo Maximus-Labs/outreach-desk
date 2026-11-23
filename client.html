@@ -30,7 +30,7 @@ a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline} a:fo
 .ph{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px} .ph span{font-size:12.5px;color:var(--text3)}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--text2)} .legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
 svg text{font-family:var(--mono);font-size:10.5px;fill:var(--text3)}
-.wrap{overflow-x:auto}
+.wrap{overflow-x:auto} #cv-wrap{overflow-y:auto} #cv-wrap thead th{position:sticky;top:0;background:var(--surface);z-index:1}
 .scroll{overflow-y:auto;overflow-x:hidden}
 .scroll table{table-layout:fixed} .scroll td{overflow-wrap:anywhere} .scroll td a{word-break:break-word}
 @media (max-width:640px){
@@ -58,7 +58,7 @@ td.d{font-family:var(--mono);white-space:nowrap;color:var(--text2)}
 </div>
 <section class="panel" aria-labelledby="h-act"><div class="ph"><h2 id="h-act">Daily activity</h2><div class="legend"><span><i style="background:var(--acc)"></i>Emails sent</span><span><i style="background:var(--yes)"></i>Replies</span></div></div><div id="chart"></div></section>
 <section class="panel" aria-labelledby="h-ex"><div class="ph"><h2 id="h-ex">Live exchanges</h2><span id="ex-note">Both pages published</span></div><div class="scroll" id="ex-wrap"><table><thead><tr><th>Partner</th><th>DR</th><th>Led by</th><th>Date</th><th>Their page (lists you)</th><th>Your page (lists them)</th></tr></thead><tbody id="ex"></tbody></table></div></section>
-<section class="panel" aria-labelledby="h-cv"><div class="ph"><h2 id="h-cv">Conversations</h2><span>Companies discussing an exchange</span></div><div class="wrap"><table><thead><tr><th>Company</th><th>Status</th><th>Last update</th></tr></thead><tbody id="cv"></tbody></table></div></section>
+<section class="panel" aria-labelledby="h-cv"><div class="ph"><h2 id="h-cv">Conversations</h2><span id="cv-note">Companies discussing an exchange</span></div><div class="wrap" id="cv-wrap"><table><thead><tr><th>Company</th><th>Status</th><th>Last update</th></tr></thead><tbody id="cv"></tbody></table></div></section>
 <p class="foot">Prepared by MaximusLabs. Updated twice a day, at about 9:10 and 15:10 IST.<span id="back"></span> · <a href="#" id="out">Sign out</a></p>
 </main>
 <script>
@@ -123,6 +123,10 @@ function render(c) {
   });
   $("cv").replaceChildren(...(c.conversations.length ? c.conversations.map(x => el("tr", {}, el("td", { text: x.company }), el("td", {}, el("span", { class: "pill " + (x.status === "Agreed" ? "yes" : "wip"), text: x.status })), el("td", { class: "d", text: x.last_at ? short(x.last_at) : "" })))
     : [el("tr", {}, el("td", { colspan: "3", class: "empty", text: "No conversations open right now." }))]));
+  requestAnimationFrame(() => {   // show six conversations; scroll for the rest
+    const w = $("cv-wrap"), rs = [...w.querySelectorAll("tbody tr")];
+    if (rs.length > 6) { w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs.slice(0, 6).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px"; $("cv-note").textContent = `${rs.length} companies discussing an exchange · scroll for more`; }
+  });
 }
 
 document.getElementById("out").onclick = e => { e.preventDefault(); window.signOut(); };
