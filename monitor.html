@@ -884,7 +884,7 @@ table.led td.muted { color: var(--text3) }
   const originTag = x => { const o = ORIGIN[x.origin]; return o ? el("small", { class: `otag ${o[1]}`, text: o[0], title: o[2] }) : null; };
   // Our link checked live on their page (sync adds c.link_checks {url-without-protocol: {live, rel, checked}}).
   const normU = u => String(u || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
-  const liveTag = x => { const k = (x._chk || {})[normU(x.their_url)]; if (!k || !k.live) return null;
+  const liveTag = x => { const k = (x._chk || {})[normU(x.their_url)]; if (!k) return null; if (!k.live) return el("small", { class: "lchk warn", text: `${x._cn || "Our"} link not found on page`, title: `Checked ${k.checked || ""}` });
     const df = !/sponsored|nofollow|ugc/.test(k.rel || "");
     return el("small", { class: `lchk ${df ? "ok" : "warn"}`, text: `${x._cn || "Our"} link live${df ? " · dofollow" : " · " + k.rel}`, title: `Checked ${k.checked || ""}` }); };
   // Exchanges one per pair of pages (a sheet cell may hold several links, one per line), grouped by partner:
