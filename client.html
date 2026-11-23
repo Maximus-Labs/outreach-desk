@@ -24,7 +24,7 @@ a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline} a:fo
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .lchk{display:block;font:12px/1.35 var(--body);margin-top:2px} .lchk.ok{color:var(--yes)} .lchk.warn{color:var(--wip)}
 #ex td.drc{border-right:1px solid var(--line)} .drv{display:inline-block;min-width:30px;padding:1px 6px;border-radius:6px;background:var(--raised);border:1px solid var(--line);font:500 12.5px var(--mono);color:var(--text);text-align:center}
-.otag{display:inline-block;white-space:nowrap;font:12.5px/1.35 var(--body)} #ex td.led{border-right:1px solid var(--line)} .otag.us{color:var(--yes)} .otag.co{color:var(--acc)} .otag.client{color:var(--wip)}
+.otag{display:inline-block;white-space:normal;overflow-wrap:anywhere;font:12.5px/1.35 var(--body)} #ex td.led{border-right:1px solid var(--line)} .otag.us{color:var(--yes)} .otag.co{color:var(--acc)} .otag.client{color:var(--wip)}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:4px;align-content:start}
 .kpi span{font-size:13px;color:var(--text2)} .kpi b{font:500 38px/1.05 var(--mono);font-variant-numeric:tabular-nums} .kpi small{font-size:12px;color:var(--text3)}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
@@ -41,7 +41,7 @@ svg text{font-family:var(--mono);font-size:10.5px;fill:var(--text3)}
   .scroll td{border:0;padding:2px 0} .scroll td:first-child{font-weight:600} #ex td.p{background:none;border:0;padding:6px 0 2px} #ex td.led,#ex td.drc{border:0;padding:2px 0} #ex tr{border-bottom:0;padding:6px 2px} #ex tr.g0{border-top:1px solid var(--line)} #ex tr.g0 td{border-top:0} #ex tr.g0:first-child{border-top:0} #ex td.d{font-weight:400}
   .scroll td[data-l]::before{content:attr(data-l);display:block;font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:6px}
 }
-.scroll th:nth-child(1){width:15%} .scroll th:nth-child(2){width:6%} .scroll th:nth-child(3){width:10%} .scroll th:nth-child(4){width:11%} .scroll th:nth-child(5),.scroll th:nth-child(6){width:29%} td.p{border-right:1px solid var(--line);background:var(--raised,#18181a)} td.p b{display:block;font-weight:600} td.p small{display:block;margin-top:3px;font:12px var(--mono);color:var(--text3)} #ex tr.g0 td{border-top:1px solid var(--line)} .scroll thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+.scroll th:nth-child(1){width:15%} .scroll th:nth-child(2){width:6%} .scroll th:nth-child(3){width:12%} .scroll th:nth-child(4){width:11%} .scroll th:nth-child(5),.scroll th:nth-child(6){width:28%} td.p{border-right:1px solid var(--line);background:var(--raised,#18181a)} td.p b{display:block;font-weight:600} td.p small{display:block;margin-top:3px;font:12px var(--mono);color:var(--text3)} #ex tr.g0 td{border-top:1px solid var(--line)} .scroll thead th{position:sticky;top:0;background:var(--surface);z-index:1}
 table{width:100%;border-collapse:collapse;font-size:13.5px} th{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
 td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top} tr:last-child td{border-bottom:0}
 td.d{font-family:var(--mono);white-space:nowrap;color:var(--text2)}
@@ -120,7 +120,7 @@ function render(c) {
       i ? null : el("td", { class: "drc", rowspan: String(g.rows.length), "data-l": "DR", title: "Domain Rating (Ahrefs)" }, el("span", { class: "drv", text: drOf(g.p) })),
       i ? null : el("td", { class: "led", rowspan: String(g.rows.length), "data-l": "Led by" }, ORIGIN[g.rows[0].origin] ? el("span", { class: `otag ${ORIGIN[g.rows[0].origin][1]}`, text: ORIGIN[g.rows[0].origin][0], title: ORIGIN[g.rows[0].origin][2] }) : "–"),
       el("td", { class: "d", "data-l": "Date", text: x.live ? pretty(x.live) : (x.month || "Earlier") }),
-      el("td", { "data-l": "Their page (lists you)" }, link(x.their_url), liveTag(x.their_url)), el("td", { "data-l": "Your page (lists them)" }, link(x.our_url)))))
+      el("td", { "data-l": "Their page (lists you)" }, link(x.their_url)), el("td", { "data-l": "Your page (lists them)" }, link(x.our_url)))))
     : [el("tr", {}, el("td", { colspan: "6", class: "empty", text: "None yet. Exchanges appear here once both pages are published." }))]));
   requestAnimationFrame(() => {   // show five exchanges; scroll for the rest
     const w = $("ex-wrap"), rs = [...w.querySelectorAll("tbody tr")];
