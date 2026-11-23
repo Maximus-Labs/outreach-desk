@@ -203,4 +203,5 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   .app{grid-template-columns:56px minmax(0,1fr)}
   .work{display:none} .app.reading .list{display:none} .app.reading .work{display:flex}
   .wh .back{display:inline-flex}
+  .wh{flex-wrap:wrap;padding:10px 14px;gap:8px} .wh .t{flex:1 1 160px} .wh .acts{margin-left:0;width:100%} .wh .k{display:none}
 }
