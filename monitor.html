@@ -975,10 +975,28 @@ table.led td.muted { color: var(--text3) }
   // The data may be split over several cells (one per CSV line); join them back. No trimming: a split can fall on a space.
   const unq = l => l.startsWith('"') && l.endsWith('"') ? l.slice(1, -1).replace(/""/g, '"') : l;
   const cell = csv => csv.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.length).map(unq).join("");
-  window.whenAuthed
-    .then(() => SB.from("sheet_tabs").select("rows").eq("tab", "Site").maybeSingle())
-    .then(({ data, error }) => {
-      if (error || !data) throw new Error(error ? error.message : "no data");
+  // Accept the Site data either parsed ({updated, clients}) or as raw sheet cells (the JSON split over A1..An).
+  const asSite = rows => {
+    if (rows && !Array.isArray(rows) && rows.clients) return rows;
+    if (Array.isArray(rows)) { const d = JSON.parse(rows.map(r => Array.isArray(r) ? (r[0] || "") : String(r || "")).join("")); if (d && d.clients) return d; }
+    throw new Error("unreadable Site data");
+  };
+  // Right after a refresh the login session can still be settling, so the first read sometimes comes back empty.
+  // Try up to 4 times (0.6s, 1.2s, 2.4s apart) before showing the error.
+  const loadSite = async () => {
+    let last;
+    for (let i = 0; i < 4; i++) {
+      try {
+        await window.whenAuthed;
+        const { data, error } = await SB.from("sheet_tabs").select("rows").eq("tab", "Site").maybeSingle();
+        if (error || !data) throw new Error(error ? error.message : "no data");
+        return { data: { rows: asSite(data.rows) } };
+      } catch (e) { last = e; await new Promise(r => setTimeout(r, 600 * 2 ** i)); }
+    }
+    throw last;
+  };
+  loadSite()
+    .then(({ data }) => {
       const d = data.rows;
       const when = d.updated ? `Updated ${d.updated} IST` : "";
       $("updated").textContent = when; $("client-updated").textContent = when; $("home-updated").textContent = when;
@@ -988,7 +1006,7 @@ table.led td.muted { color: var(--text3) }
       if (!c) throw new Error("no client");
       renderClient({ client: c, updated: d.updated });
     })
-    .catch(() => { const b = $("banner"); b.textContent = "The dashboard data couldn't be loaded. Refresh the page; if it keeps failing, ask the team."; b.className = "banner err"; b.hidden = false; });
+    .catch(e => { console.warn("Monitoring data:", e && e.message); const b = $("banner"); b.textContent = "The dashboard data couldn't be loaded. Refresh the page; if it keeps failing, ask the team."; b.className = "banner err"; b.hidden = false; });
 })();
 </script>
 <script>Shell.mount("monitoring", new URLSearchParams(location.search).get("c") || "");</script>
