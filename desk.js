@@ -1,10 +1,11 @@
-// Outreach Desk — one page. Email text is always inserted through esc(): never as HTML.
+// Reply desk · v3. Email text is always inserted through esc(): never as HTML.
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-// Cloud version: every read comes from Supabase (after login); every action is a request row the PC worker handles.
+// Every read comes from Supabase (after login); every action is a request row the PC worker handles.
 const snap = async key => { await window.whenAuthed; const {data, error} = await SB.from("desk_state").select("value,updated_at").eq("key", key).maybeSingle();
   if (error) throw new Error(error.message); return data ? data.value : null; };
-const openReqs = async () => { const {data} = await SB.from("requests").select("id,type,client,thread_id,payload,status,created_at").in("status", ["pending", "received"]).order("created_at"); return data || []; };
+const openReqs = async () => { const {data, error} = await SB.from("requests").select("id,type,client,thread_id,payload,status,created_at").in("status", ["pending", "received"]).order("created_at");
+  if (error) throw new Error(error.message); return data || []; };
 const addReq = async (type, client, thread_id, payload) => { await window.whenAuthed;
   const {data, error} = await SB.from("requests").insert({type, client, thread_id, payload: payload || {}}).select("id,created_at").single();
   if (error) throw new Error(error.message); return {id: data.id, status: "working", thread_id, client, instruction: (payload || {}).instruction || "", started: data.created_at}; };
@@ -13,12 +14,13 @@ const api = async (path, body) => {
   const u = new URL(path, location.origin), p = u.pathname.split("/").filter(Boolean).slice(1), post = body !== undefined;
   if (!post && p[0] === "jobs") {
     const [j, reqs] = await Promise.all([snap("jobs"), openReqs()]);
+    S.reqs = reqs;
     const map = {}; ((j && j.jobs) || []).forEach(x => map[x.thread_id] = x);
     for (const r of reqs) {
       if (r.type === "draft") map[r.thread_id] = Object.assign({}, map[r.thread_id] || {}, {id: r.id, client: r.client, thread_id: r.thread_id, status: "working", instruction: (r.payload || {}).instruction || "", started: r.created_at});
       if (r.type === "send" && map[r.thread_id]) map[r.thread_id] = Object.assign({}, map[r.thread_id], {status: "sending"});
     }
-    return {jobs: Object.values(map), pending: reqs.length, worker_online: !!(j && j.worker_online), oldest: reqs[0] && reqs[0].created_at};
+    return {jobs: Object.values(map), pending: reqs.length, worker_online: !!(j && j.worker_online)};
   }
   if (!post && p[0] === "overview") return await snap("overview") || {clients: [], updated: null};
   if (!post && p[0] === "knowledge") return await snap("knowledge") || {learned: "", decisions: [], memory_files: [], handover: ""};
@@ -46,29 +48,59 @@ const api = async (path, body) => {
   throw new Error("not available online: " + path);
 };
 
+// ---------------- helpers ----------------
 const toast = (msg, err, onClick) => {
   const t = document.createElement("div");
   t.className = "toast" + (err ? " err" : ""); t.textContent = msg;
-  if (onClick) t.onclick = () => { onClick(); t.remove(); };
+  if (onClick) { t.style.cursor = "pointer"; t.onclick = () => { onClick(); t.remove(); }; }
   $("#toasts").append(t); setTimeout(() => t.remove(), err ? 9000 : 6000);
 };
-const ago = d => d < 1 ? `${Math.max(1, Math.round(d * 24))}h` : `${Math.round(d)}d`;
-const initials = s => (s || "?").replace(/<.*>/, "").trim().split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
+const initials = s => (s || "?").replace(/<.*>/, "").replace(/["']/g, "").trim().split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
 const addrOf = s => ((s || "").match(/<([^>]+)>/) || [, s || ""])[1].trim().toLowerCase();
 const nameOf = s => (s || "").split("<")[0].replace(/"/g, "").trim() || addrOf(s);
-const fmtTs = ts => { const n = Number(ts); const d = isNaN(n) ? new Date(ts) : new Date(n > 1e11 ? n : n * 1000);
-  return isNaN(d) ? String(ts || "") : d.toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}); };
-const hue = s => { let h = 0; for (const c of s || "") h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 45% 38%)`; };
-const STAGES = [["proposed", "Proposed"], ["agreed", "Agreed"], ["partner_live", "Their side live"], ["our_live", "Our side live"], ["closed", "Closed"]];
+const toDate = ts => { const n = Number(ts); return isNaN(n) ? new Date(ts) : new Date(n > 1e11 ? n : n * 1000); };
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const isToday = d => { const n = new Date(); return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate(); };
+const when = ts => { if (!ts) return ""; const d = toDate(ts); if (isNaN(d)) return String(ts);
+  return isToday(d) ? d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}) : `${d.getDate()} ${MON[d.getMonth()]}`; };
+const whenLong = ts => { if (!ts) return ""; const d = toDate(ts); if (isNaN(d)) return String(ts);
+  return (isToday(d) ? "Today " : `${d.getDate()} ${MON[d.getMonth()]} `) + d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}); };
+const LOGO = {oliv: "oliv.ai", easywebinar: "easywebinar.com", versatile: "versatile.club", luca: "ask-luca.com", maximuslabs: "maximuslabs.ai", teamvoy: "teamvoy.com"};
+const logo = (key, name) => LOGO[key] ? `<span class="lg"><img src="https://www.google.com/s2/favicons?domain=${LOGO[key]}&sz=64" alt="" onerror="this.replaceWith(document.createTextNode('${esc((name || key)[0])}'))"></span>`
+  : `<span class="lg">${esc((name || key || "?")[0])}</span>`;
+const ICON = {
+  mon: '<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>',
+  mail: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>',
+  spark: '<svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>',
+  out: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
+};
+// the status line on each row (colour follows the status automatically)
+function rowStatus(r) {
+  if (r.job === "sending") return ["Sending", "var(--acc)", true];
+  if (r.job === "working") return ["Drafting", "var(--acc)", true];
+  if (r.job === "error") return ["Failed", "var(--red)"];
+  if (r.outdated) return ["New email", "var(--amber)"];
+  if (r.followup) return [`Follow-up · ${Math.round(r.age_days)} days`, "var(--text3)"];
+  if (r.bucket === "our" && r.age_days >= 3) return [`Late · ${Math.round(r.age_days)} days`, "var(--red)"];
+  if (r.decision) return ["Your call", "var(--amber)"];
+  const st = r.stage || "";
+  if (/live/i.test(st)) return [st, "var(--green)"];
+  if (/counter|different|paid/i.test(st)) return [st, "var(--violet)"];
+  if (/draft|blurb/i.test(st)) return [st, "var(--amber)"];
+  if (r.job === "ready") return ["Draft ready", "var(--acc)"];
+  return [st || "New reply", "var(--acc)"];
+}
 
-const S = {overview: null, client: "", queue: null, open: {others: false}, thread: null, sel: null, jobs: {}, online: false, threadSig: "", showOlder: false};
+const S = {overview: null, clients: [], client: "", queue: null, view: "all", tab: "reply", thread: null, sel: null, jobs: {}, online: false,
+  threadSig: "", reqs: [], chat: [], lastOk: null, search: ""};
 
 // ---------------- polling ----------------
 async function tick() {
   try {
     const j = await api("/api/jobs");
-    S.online = j.worker_online;
-    window.__claudeOnline = j.worker_online;
+    S.online = j.worker_online; window.__claudeOnline = j.worker_online;
     const next = {}; j.jobs.forEach(x => next[x.thread_id] = x);
     for (const x of j.jobs) {
       const was = S.jobs[x.thread_id];
@@ -77,164 +109,218 @@ async function tick() {
     }
     for (const tid of Object.keys(S.jobs)) if (S.jobs[tid].status === "sending" && !next[tid]) toast("Sent · " + (S.jobs[tid].subject || ""));
     S.jobs = next;
-    await loadSide(); await loadQueue();
+    const [ov, chat, cl] = await Promise.all([api("/api/overview"), snap("chat"), S.clients.length ? null : snap("clients")]);
+    S.overview = ov; S.chat = chat || []; if (cl) S.clients = cl;
+    await loadQueue();
+    renderRail();
     if (S.sel) { const jb = S.jobs[S.sel.tid]; const sig = jb ? jb.id + jb.status : "none";
-      if (sig !== S.threadSig || (S.thread && S.thread.loading)) openThread(S.sel.key, S.sel.tid, true); }
-  } catch (e) {}
+      if (sig !== S.threadSig || (S.thread && S.thread.loading)) openThread(S.sel.key, S.sel.tid, true); else renderChat(); }
+    S.lastOk = new Date(); setSync(true);
+  } catch (e) { console.error("refresh failed", e); setSync(false, e); }
+}
+function setSync(ok, e) {
+  const s = $("#sync"), b = $("#banner"), t = S.lastOk ? S.lastOk.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}) : "";
+  s.className = "sync " + (ok ? "ok" : "err");
+  $("#syncTxt").textContent = ok ? `Synced ${t}${S.online ? "" : " · Claude offline"}` : (t ? `Using ${t} data` : "Not loaded");
+  b.hidden = ok;
+  if (!ok) b.textContent = `Couldn't refresh${e && e.message ? ` (${e.message.slice(0, 80)})` : ""}. ${t ? `Showing data from ${t}.` : ""} Retrying…`;
 }
 
-// ---------------- sidebar ----------------
-async function loadSide() {
-  const o = await api("/api/overview"); S.overview = o;   // the sidebar itself is drawn by shell.js
+// ---------------- rail ----------------
+function renderRail() {
+  const ov = (S.overview && S.overview.clients) || [], q = S.queue || {reply: []};
+  const allQ = S.allReply || q.reply || [];
+  const total = ov.reduce((a, c) => a + (c.reply || 0), 0);
+  const late = k => allQ.some(r => r.client === k && r.bucket === "our" && r.age_days >= 3);
+  const item = (cls, href, ic, label, ct, extra = "") => `<a class="ri ${cls}" href="${href}" ${extra}>${ic}<span>${label}</span><span class="ct">${ct || ""}</span></a>`;
+  $("#rail").innerHTML =
+    item("", "monitor.html", `<span class="ic">${ICON.mon}</span>`, "Monitoring") +
+    item("on", "desk.html", `<span class="ic">${ICON.mail}</span>`, "Reply", total) +
+    item("", "tracker.html", `<span class="ic">${ICON.list}</span>`, "Outreach tracker") +
+    item("", "settings.html", `<span class="ic">${ICON.gear}</span>`, "Settings") +
+    `<div class="sep"></div>` +
+    item(S.client ? "" : "on", "desk.html", `<span class="lg all">All</span>`, "All clients", total, 'data-k=""') +
+    ov.map(c => `<a class="ri ${S.client === c.key ? "on" : ""}" href="desk.html?c=${esc(c.key)}" data-k="${esc(c.key)}" title="${esc(c.name)}">${logo(c.key, c.name)}${late(c.key) ? '<i class="dot" aria-label="late replies"></i>' : ""}<span>${esc(c.name)}</span><span class="ct">${c.reply || ""}</span></a>`).join("") +
+    `<div class="rail-foot">` +
+    `<a class="ri" href="#" id="askBtn"><span class="ic">${ICON.spark}</span><span>Ask Claude</span></a>` +
+    `<a class="ri" href="#" id="outBtn"><span class="ic">${ICON.out}</span><span>Sign out</span></a></div>`;
+  document.querySelectorAll("#rail a[data-k]").forEach(a => a.onclick = e => { e.preventDefault(); pickClient(a.dataset.k); });
+  $("#askBtn").onclick = e => { e.preventDefault(); const b = document.querySelector(".cb-btn"); if (b) b.click(); };
+  $("#outBtn").onclick = e => { e.preventDefault(); window.signOut && window.signOut(); };
 }
-function pickClient(k) { S.client = k; $("#app").classList.remove("reading"); if (window.Shell) Shell.setClient(k); loadSide(); loadQueue(); }
+function pickClient(k) {
+  S.client = k || ""; history.replaceState(null, "", S.client ? "?c=" + S.client : location.pathname);
+  if (window.Shell) Shell.setClient(S.client); loadQueue().then(renderRail);
+}
 
-// ---------------- queue ----------------
+// ---------------- list ----------------
+const TABS = [["reply", "Needs reply"], ["client", "Waiting"], ["done", "Done"], ["paid", "Paid"], ["other", "Other"]];
 async function loadQueue() {
-  const want = S.client;  // a slower answer for a client you already left must not overwrite this one
-  const q = await api("/api/queue" + (want ? `?client=${want}` : ""));
+  const want = S.client;
+  const [q, all] = await Promise.all([api("/api/queue" + (want ? `?client=${want}` : "")), want ? api("/api/queue") : null]);
   if (want !== S.client) return;
-  S.queue = q;
-  const term = (S.search || "").trim().toLowerCase();
-  if (term) for (const k of ["reply", "done", "client", "paid", "other"])
-    q[k] = q[k].filter(r => [r.who, r.domain, r.subject, r.snippet, r.client_name, r.to, r.stage].join(" ").toLowerCase().includes(term));
-  const c = S.overview && S.overview.clients.find(x => x.key === S.client);
-  $("#qTitle").textContent = c ? c.name : "All clients";
-  $("#qSub").textContent = `${q.reply.length} need our reply` + (q.monitor_at ? ` · statuses from monitoring ${new Date(q.monitor_at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"})}` : "");
+  S.allReply = (all || q).reply; S.queue = q;
+  const term = S.search.trim().toLowerCase();
+  const view = {};
+  for (const k of ["reply", "client", "done", "paid", "other"])
+    view[k] = term ? q[k].filter(r => [r.who, r.domain, r.subject, r.snippet, r.client_name, r.to, r.stage].join(" ").toLowerCase().includes(term)) : q[k];
+  S.view_q = view;
+  const c = (S.overview && S.overview.clients || []).find(x => x.key === S.client);
+  $("#qTitle").textContent = c ? c.name : "Received emails";
+  $("#qSub").textContent = `${q.reply.length} need a reply`;
   $("#pullOne").title = c ? `Pull ${c.name} from Gmail` : "Pull all clients from Gmail";
+  const tab = S.tab;
+  $("#qTabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}<b>${view[k].length}</b></button>`).join("");
+  document.querySelectorAll("#qTabs button").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; loadQueue(); });
   const row = r => {
-    const j = r.job, sel = S.sel && S.sel.tid === r.thread_id;
-    const tag = j === "ready" && r.outdated ? `<span class="tag call">new email</span>` : j === "ready" ? (r.decision ? `<span class="tag call">your call</span>` : `<span class="tag ready">draft ready</span>`)
-      : /^(working|sending)/.test(j) ? `<span class="tag busy"><span class="spin"></span> ${j === "sending" ? "sending" : "drafting"}</span>`
-      : j === "error" ? `<span class="tag err">failed</span>` : "";
-    return `<button class="qi" data-k="${esc(r.client)}" data-t="${esc(r.thread_id)}" aria-current="${sel}">
-      <span class="r1">${S.client ? "" : `<span class="cdot" style="background:${esc(r.color)}" title="${esc(r.client_name)}"></span>`}
-        <span class="who">${esc(r.who)}</span><span class="age ${r.age_days >= 3 ? "old" : ""}">${ago(r.age_days)}</span></span>
-      <span class="subj">${esc(r.subject.replace(/^(re:\s*)+/i, ""))}</span>
-      ${r.snippet ? `<span class="snip">${esc(r.snippet)}</span>` : ""}
-      <span class="tags">${S.client ? "" : `<span class="tag">${esc(r.client_name)}</span>`}${r.followup ? '<span class="tag fu">follow-up</span>' : r.bucket !== "our" ? `<span class="tag">${esc(r.stage)}</span>` : ""}${tag}</span></button>`;
+    const [st, col, busy] = rowStatus(r), sel = S.sel && S.sel.tid === r.thread_id;
+    return `<button class="qi" data-k="${esc(r.client)}" data-t="${esc(r.thread_id)}" aria-current="${!!sel}">
+      <span class="av">${esc(initials(r.who))}</span>
+      <span class="who"><b>${esc(r.who)}</b><span>${esc(r.domain)}${S.client ? "" : " · " + esc(r.client_name)}</span></span>
+      <span class="meta"><span class="n">${esc(when(r.ts))}</span><span class="st" style="--c:${col}">${busy ? '<span class="spin"></span>' : ""}${esc(st)}</span></span></button>`;
   };
-  const TABS = [["reply", "Needs our reply"], ["client", "Waiting on them"], ["done", "Completed"], ["paid", "Paid"], ["other", "Other"]];
-  const tab = S.tab || "reply";
-  $("#qTabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" class="q-tab ${k === "reply" ? "hot" : ""}" data-tab="${k}" aria-selected="${tab === k}">${l}<span class="n">${q[k].length}</span></button>`).join("");
-  document.querySelectorAll(".q-tab").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; loadQueue(); });
-  const empty = {reply: `Nothing needs our reply${S.client ? " here" : ""}. ✓`, client: "No thread is waiting on them.", done: "No completed exchanges yet.", paid: "No paid-only replies.", other: "Nothing else."}[tab];
-  $("#qList").innerHTML = q[tab].length ? q[tab].map(row).join("") : `<div class="q-empty">${term ? `No match for “${esc(S.search)}” here. Counts on the buttons show where it matches.` : empty}</div>`;
-  document.querySelectorAll(".qi").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
-  document.querySelectorAll(".q-sec").forEach(b => b.onclick = () => { S.open[b.dataset.sec] = !S.open[b.dataset.sec]; loadQueue(); });
+  const list = view[tab];
+  let html;
+  if (!list.length) html = `<div class="empty-l">${term ? `No match for “${esc(S.search)}” here.` : {reply: "Nothing needs a reply. ✓", client: "Nobody to wait on.", done: "No completed exchanges yet.", paid: "No paid-only replies.", other: "Nothing else."}[tab]}</div>`;
+  else if (tab === "reply") {
+    const now = list.filter(r => !r.followup), fu = list.filter(r => r.followup);
+    html = (now.length ? `<div class="grp"><span>Needs reply</span><span>${now.length}</span></div>` + now.map(row).join("") : "") +
+           (fu.length ? `<div class="grp"><span>Follow-up due</span><span>${fu.length}</span></div>` + fu.map(row).join("") : "");
+  } else html = list.map(row).join("");
+  $("#qList").innerHTML = html;
+  document.querySelectorAll("#qList .qi").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
+  renderToday();
+}
+function renderToday() {
+  const ov = (S.overview && S.overview.clients) || [];
+  const rows = (S.allReply || []).filter(r => r.ts && isToday(toDate(r.ts)) && (!S.client || r.client === S.client));
+  const cs = S.client ? ov.filter(c => c.key === S.client) : ov;
+  $("#today").innerHTML = cs.map(c => {
+    const mine = rows.filter(r => r.client === c.key), doms = {};
+    mine.forEach(r => (doms[r.domain] = doms[r.domain] || []).push(r));
+    return `<div class="acct"><div class="acct-h">${logo(c.key, c.name)}<b>${esc(c.name)}</b><span class="ct${mine.length ? "" : " zero"}">${mine.length}</span></div>` +
+      Object.entries(doms).map(([d, arr]) => `<div class="dom"><small>${esc(d)}</small>${arr.map(r => `<button data-k="${esc(r.client)}" data-t="${esc(r.thread_id)}" aria-current="${!!(S.sel && S.sel.tid === r.thread_id)}">${esc(r.who)}</button>`).join("")}</div>`).join("") + `</div>`;
+  }).join("") || `<div class="empty-l">No clients yet.</div>`;
+  document.querySelectorAll("#today button[data-t]").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
+}
+function setView(v) {
+  S.view = v; document.querySelectorAll(".views button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  $("#qList").hidden = v === "today"; $("#qTabs").hidden = v === "today"; $("#today").hidden = v !== "today";
+}
+const flatList = () => { const v = (S.view_q || {})[S.tab] || []; return S.tab === "reply" ? [...v.filter(r => !r.followup), ...v.filter(r => r.followup)] : v; };
+function step(d) {
+  const l = flatList(); if (!l.length) return;
+  const i = S.sel ? l.findIndex(r => r.thread_id === S.sel.tid) : -1, r = l[Math.min(l.length - 1, Math.max(0, i + d))];
+  if (r) openThread(r.client, r.thread_id);
 }
 
-// ---------------- thread + composer ----------------
+// ---------------- reply area ----------------
 async function openThread(key, tid, quiet) {
   const changed = !S.sel || S.sel.tid !== tid;
   S.sel = {key, tid}; $("#app").classList.add("reading");
-  if (changed) { S.showOlder = false; document.querySelectorAll(".qi").forEach(b => b.setAttribute("aria-current", b.dataset.t === tid));
-    if (!quiet) $("#work").innerHTML = `<div class="empty-state"><div class="es-s"><span class="spin"></span> Opening…</div></div>`; }
-  const t = await api(`/api/clients/${key}/threads/${encodeURIComponent(tid)}`);
+  if (changed) {
+    document.querySelectorAll("[data-t]").forEach(b => b.setAttribute("aria-current", b.dataset.t === tid));
+    if (!quiet) $("#work").innerHTML = `<div class="empty"><span><span class="spin"></span> Opening…</span></div>`;
+  }
+  let t;
+  try { t = await api(`/api/clients/${key}/threads/${encodeURIComponent(tid)}`); }
+  catch (e) { if (!quiet) $("#work").innerHTML = `<div class="empty"><b>Couldn't open this email</b><span>${esc(e.message)}</span></div>`; return; }
   if (!S.sel || S.sel.tid !== tid) return;
   if (t.job) S.jobs[tid] = t.job;
   const jb = S.jobs[tid]; S.threadSig = jb ? jb.id + jb.status : "none";
-  // keep what the user is typing: skip the re-render while they are in the composer
-  if (quiet && !changed && S.thread && !S.thread.loading && !t.loading && document.activeElement && $("#work").contains(document.activeElement)) { S.thread = t; renderBrief(); return; }
-  S.thread = t; renderWork(); renderBrief();
+  // keep what the user is typing: skip the re-render while they are in the reply
+  if (quiet && !changed && S.thread && !S.thread.loading && !t.loading && document.activeElement && $("#work").contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) { S.thread = t; renderCtx(); return; }
+  S.thread = t; renderWork(); renderCtx();
 }
-
-function statusLabel(tid) {
-  const q = S.queue || {}, names = {done: "Completed · link secured", client: "Waiting on their reply", paid: "Paid", other: "Other"};
-  const r = (q.reply || []).find(x => x.thread_id === tid);
-  if (r) return r.followup ? "Follow-up due" : "Needs our reply";
-  for (const k of Object.keys(names)) if ((q[k] || []).some(x => x.thread_id === tid)) return names[k];
-  return "Not in monitoring";
-}
+const rowOf = tid => { const q = S.queue || {}; for (const k of ["reply", "client", "done", "paid", "other"]) { const r = (q[k] || []).find(x => x.thread_id === tid); if (r) return r; } return null; };
+const clientOf = key => (S.clients || []).find(c => c.key === key) || ((S.overview && S.overview.clients) || []).find(c => c.key === key) || {key};
 
 function renderWork() {
-  const t = S.thread, c = S.overview.clients.find(x => x.key === S.sel.key) || {};
-  const subj = esc((t.subject || "").replace(/^(re:\s*)+/i, ""));
-  const head = `<div class="gm-head"><h2 class="gm-subj">${subj}</h2>
-      <span class="gm-label" style="--lc:${esc(c.color)}">${esc(c.name)}</span>
-      <span class="gm-label gm-label-plain">${esc(statusLabel(S.sel.tid))}</span></div>`;
+  const t = S.thread, key = S.sel.key, c = clientOf(key), r0 = rowOf(S.sel.tid) || {};
+  const meta = t.meta || {}, who = nameOf(meta.partner || "") || r0.who || meta.to || "Partner";
+  const [st] = r0.thread_id ? rowStatus(r0) : [meta.status || ""];
+  const head = `<header class="wh">
+      <button class="btn back" id="back" aria-label="Back to the list">←</button>
+      <span class="av">${esc(initials(who))}</span>
+      <div class="t"><b>${esc(who)}</b><span>${esc(r0.domain || meta.to || "")} · ${esc(c.name || r0.client_name || key)}${t.mailbox ? " · via " + esc(t.mailbox) : ""}</span></div>
+      ${st ? `<span class="chip">${esc(st)}</span>` : ""}
+      <div class="acts"><button class="btn ctx-btn" id="ctxBtn">Brief</button><button class="btn" id="skipTop">Skip <span class="k">S</span></button><button class="btn" id="nextBtn">Next <span class="k">J</span></button></div>
+    </header>`;
   if (t.loading) {
-    $("#work").innerHTML = `<div class="gm">${head}<div class="gm-reply"><div class="gm-wait"><span class="spin"></span> ${S.online ? "Claude is fetching this thread from Gmail…" : "Queued. No Claude session is working the desk right now; it will be picked up at the next scheduled run (7:25 / 1:25) or when a session is asked to work the desk."}</div></div></div>`;
-    return;
+    $("#work").innerHTML = head + `<div class="wb"><div class="wb-in"><div class="wait"><span class="spin"></span><div><b>Fetching this thread from Gmail…</b>
+      <span class="m">${S.online ? "Claude is on it." : "Claude is offline; it will be fetched at the next desk run (7:25 / 1:25) or when a session works the desk."}</span></div></div></div></div>`;
+    wireHead(); return;
   }
   const ours = (c.mailboxes || []).map(m => m.toLowerCase());
   const msgs = t.messages || [];
-  // Order (user, 20 Nov): [View previous replies] → latest reply from them → draft at the bottom.
   const lastIdx = msgs.length - 1;
-  const lastIsOurs = lastIdx >= 0 && ours.includes(addrOf(msgs[lastIdx].from));
   const theirIdx = msgs.map((m, i) => [m, i]).reverse().find(([m]) => !ours.includes(addrOf(m.from)));
-  const latestIdx = lastIsOurs && t.meta && t.meta.status === "follow-up-due" ? lastIdx : (theirIdx ? theirIdx[1] : lastIdx);
-  const mail = m => {
-    const us = ours.includes(addrOf(m.from));
-    return `<div class="gm-msg">
-      <span class="gm-av" style="background:${us ? esc(c.color) : hue(addrOf(m.from))}">${esc(initials(nameOf(m.from)).slice(0, 1))}</span>
-      <div class="gm-main">
-        <div class="gm-mh"><div class="gm-who"><span class="gm-name">${esc(nameOf(m.from))}</span> <span class="gm-addr">&lt;${esc(addrOf(m.from))}&gt;</span>
-          <div class="gm-to">to ${esc(us ? nameOf(m.to) : "me")} ▾</div></div>
-          <div class="gm-date">${esc(fmtTs(m.ts))}<span class="gm-ico" aria-hidden="true">☆</span><span class="gm-ico" aria-hidden="true">↩</span><span class="gm-ico" aria-hidden="true">⋮</span></div></div>
-        <div class="gm-body">${esc(m.text)}</div></div></div>`;
-  };
-  const earlier = msgs.filter((m, i) => i !== latestIdx);
-  $("#work").innerHTML = `<div class="gm">${head}
-    <details class="brief-inline"><summary>Brief <span class="bi-s" id="biS"></span><span class="m">▾</span></summary><div id="briefInline"></div></details>
-    ${earlier.length ? `<button class="gm-older" id="prevBar" aria-expanded="${S.showOlder}"><span class="gm-older-n">${earlier.length}</span><span class="gm-older-t">${S.showOlder ? "Hide previous replies" : "View previous replies"}</span></button>
-      ${S.showOlder ? earlier.map(mail).join("") : ""}` : ""}
-    ${latestIdx >= 0 ? mail(msgs[latestIdx]) : ""}
-    <div id="composer"></div></div>`;
-  const pb = $("#prevBar"); if (pb) pb.onclick = () => { S.showOlder = !S.showOlder; renderWork(); renderBrief(); };
-  renderComposer();
+  const openIdx = theirIdx ? theirIdx[1] : lastIdx;
+  const mail = (m, i) => `<div class="msg ${i === openIdx ? "open" : ""}" role="button" tabindex="0">
+      <div class="mh"><b>${esc(nameOf(m.from))}</b><span>to ${esc(ours.includes(addrOf(m.from)) ? nameOf(m.to) : "us")}</span><time>${esc(whenLong(m.ts))}</time></div>
+      <p class="sn">${esc((m.text || "").replace(/\s+/g, " ").slice(0, 220))}</p><div class="ex">${esc(m.text)}</div></div>`;
+  $("#work").innerHTML = head + `<div class="wb"><div class="wb-in">
+      <div id="composer"></div>
+      ${msgs.length ? `<div class="th-h">Thread · ${msgs.length} email${msgs.length > 1 ? "s" : ""} · click one to open it</div><section class="card">${msgs.map(mail).join("")}</section>` : ""}
+    </div></div>`;
+  document.querySelectorAll(".msg").forEach(m => { m.onclick = () => m.classList.toggle("open"); m.onkeydown = e => { if (e.key === "Enter") m.classList.toggle("open"); }; });
+  wireHead(); renderComposer();
+}
+function wireHead() {
+  $("#back").onclick = () => $("#app").classList.remove("reading");
+  $("#nextBtn").onclick = () => step(1);
+  $("#skipTop").onclick = () => skipThis();
+  $("#ctxBtn").onclick = () => $("#app").classList.toggle("ctx-open");
+}
+function skipThis() {
+  if (!S.sel) return;
+  if (!confirm("Skip this email? It is logged as 'no reply needed'.")) return;
+  act("skip", {reason: ($("#instr") || {}).value || ""}, "Skipped and logged");
 }
 
 function renderComposer() {
-  // Two clear blocks: 1) the reply itself (who, to, subject, text, actions) 2) "Ask Claude to change it" with suggestions.
   const box = $("#composer"); if (!box) return;
-  const t = S.thread, j = S.jobs[S.sel.tid] || t.job, r = j && j.result;
-  const meta = t.meta || {}, partner = nameOf(meta.partner || "") || meta.to || "them";
+  const t = S.thread, j = S.jobs[S.sel.tid] || t.job, r = j && j.result, meta = t.meta || {};
+  const c = clientOf(S.sel.key);
   const subj = "Re: " + (t.subject || "").replace(/^(re:\s*)+/i, "");
-  const ask = (btn, withSugs) => `<section class="ai-card" aria-label="Ask Claude to change the draft">
-      <div class="ai-h"><span class="gm-spark" aria-hidden="true">✦</span><b>${btn === "Draft" ? "Ask Claude to write the reply" : "Ask Claude to change this draft"}</b></div>
-      <p class="ai-hint">${btn === "Draft" ? "Leave it empty for the obvious reply, or say what you want." : "Say what to change. Claude rewrites it; you can work on other emails meanwhile."}</p>
-      <div class="ai-row"><input id="instr" placeholder="e.g. accept 1:1, offer our webcast article, make it shorter" aria-label="Instruction for Claude"><button class="ai-go" id="go">${btn}</button></div>
-      ${withSugs && (r.suggestions || []).length ? `<div class="ai-sugs"><div class="ai-sl">Suggestions</div>${r.suggestions.map(s => `<button class="gm-schip">${esc(s)}</button>`).join("")}</div>` : ""}
-    </section>`;
+  const askBar = (label, ph) => `<div class="gm-ask"><span aria-hidden="true">✦</span><input id="instr" placeholder="${ph}" aria-label="Instruction for Claude"><button id="go">${label}</button></div>`;
   if (j && /^(working|sending)/.test(j.status)) {
-    box.innerHTML = `<section class="dr-card"><div class="dr-wait"><span class="spin"></span><div><b>${j.status === "sending" ? "Sending…" : "Claude is drafting"}</b>
-      <div>${j.instruction ? `“${esc(j.instruction)}” · ` : ""}Move on to the next email; you'll get a note when it's ready.</div></div></div></section>`; return;
+    box.innerHTML = `<div class="wait"><span class="spin"></span><div><b>${j.status === "sending" ? "Sending…" : "Claude is drafting"}</b>
+      <span class="m">${j.instruction ? `“${esc(j.instruction)}” · ` : ""}Move on to the next email; you'll get a note when it's ready.</span></div></div>`;
+    return;
   }
   if (!r || (r.category === "no-reply-needed" && !r.draft_body)) {
-    box.innerHTML = `<section class="dr-card"><div class="dr-head"><div><div class="dr-title">${r ? "No reply needed" : "No draft yet"}</div>
-        <div class="dr-sub">To ${esc(meta.to || partner)} · from ${esc(t.mailbox || "")}</div></div>
-        ${r ? "" : `<button class="dr-txt" id="skip">Skip, no reply</button>`}</div>
-        ${r ? `<p class="dr-note">${esc(r.summary)}</p>` : ""}</section>${ask("Draft", false)}`;
+    box.innerHTML = `<section class="gm" aria-label="Reply"><div class="gm-h">${r ? "No reply needed" : "No draft yet"}<span>${esc(t.mailbox || "")}</span></div>
+      <div class="gm-note">${r ? esc(r.summary) : "Ask Claude to write the reply. Leave it empty for the obvious reply, or say what you want."}</div>
+      <div class="gm-t">${askBar("Draft", "e.g. accept 1:1, offer our webcast article, keep it short")}<button class="gm-sec" id="skip">Skip, no reply</button></div></section>`;
   } else {
-    box.innerHTML = `<section class="dr-card" aria-label="Reply">
-        ${j.outdated ? `<div class="dr-warn">A new email arrived after this draft was written. Ask Claude to redraft it below.</div>` : ""}
-        <div class="dr-head"><div><div class="dr-title">Reply to ${esc(partner)}</div>
-          <div class="dr-sub">from ${esc(t.mailbox || "")} · <span class="dr-cat">${esc(r.category)}</span>${j.auto ? " · drafted automatically" : ""}</div></div></div>
-        <div class="dr-fields">
-          <label class="dr-row"><span>To</span><input id="to" value="${esc(j.to || meta.to || "")}" aria-label="To"></label>
-          <div class="dr-row"><span>Subject</span><div class="dr-subj">${esc(subj)}</div></div>
-        </div>
-        <textarea class="dr-body" id="body" spellcheck="true" aria-label="Reply text">${esc(r.draft_body)}</textarea>
-        <div class="dr-actions"><button class="gm-send" id="send">Send</button><button class="dr-txt" id="gdraft">Save to Gmail</button>
-          <span class="sp"></span><button class="dr-txt dr-skip" id="skip">Skip, no reply</button></div>
-      </section>${ask("Redraft", true)}`;
+    box.innerHTML = `${j.outdated ? `<div class="warn">A new email arrived after this draft was written. Ask Claude to redraft it.</div>` : ""}
+      <section class="gm" aria-label="Reply">
+        <div class="gm-h">Reply<span>${j.auto ? "Drafted by Claude" : "Draft"} · ${esc(r.category || "")}</span></div>
+        <div class="gm-f"><span>From</span><span class="v">${esc(t.mailbox || "")}</span></div>
+        <div class="gm-f"><span>To</span><input id="to" value="${esc(j.to || meta.to || "")}" aria-label="To"></div>
+        <div class="gm-f"><span>Subject</span><span class="v">${esc(subj)}</span></div>
+        <textarea id="body" spellcheck="true" aria-label="Reply text">${esc(r.draft_body)}</textarea>
+        ${(r.suggestions || []).length ? `<div class="gm-s">${r.suggestions.map(s => `<button>${esc(s)}</button>`).join("")}</div>` : ""}
+        <div class="gm-t"><button class="gm-send" id="send">Send</button>${askBar("Redraft", "Tell Claude what to change…")}<button class="gm-sec" id="gdraft">Save draft</button></div>
+      </section>`;
     $("#send").onclick = () => confirmSend();
     $("#gdraft").onclick = () => act("save-draft", {to: $("#to").value, subject: t.subject, body: $("#body").value, mailbox: t.mailbox}, "Saving to Gmail drafts");
-    box.querySelectorAll(".gm-schip").forEach(b => b.onclick = () => { $("#instr").value = b.textContent; $("#instr").focus(); });
-    const ta = $("#body"); ta.style.height = Math.max(240, ta.scrollHeight + 6) + "px";
+    box.querySelectorAll(".gm-s button").forEach(b => b.onclick = () => { $("#instr").value = b.textContent; $("#instr").focus(); });
+    const ta = $("#body"); ta.style.height = Math.max(220, ta.scrollHeight + 6) + "px";
   }
-  const sk = $("#skip"); if (sk) sk.onclick = () => act("skip", {reason: ($("#instr") || {}).value || ""}, "Skipped and logged");
+  const sk = $("#skip"); if (sk) sk.onclick = () => skipThis();
   const go = $("#go"), inp = $("#instr");
   const start = async () => {
     go.disabled = true;
-    try { const job = await api(`/api/clients/${S.sel.key}/threads/${encodeURIComponent(S.sel.tid)}/draft`, {instruction: inp.value, revise: !!r});
-      S.jobs[S.sel.tid] = Object.assign({}, job, {status: "working"}); S.threadSig = job.id + "working"; renderComposer(); loadQueue(); }
-    catch (e) { toast(e.message, true); go.disabled = false; }
+    try { await redraft(inp.value, !!r); } catch (e) { toast(e.message, true); go.disabled = false; }
   };
   go.onclick = start; inp.onkeydown = e => { if (e.key === "Enter") start(); };
 }
-
+async function redraft(instruction, revise) {
+  const job = await api(`/api/clients/${S.sel.key}/threads/${encodeURIComponent(S.sel.tid)}/draft`, {instruction, revise});
+  S.jobs[S.sel.tid] = Object.assign({}, job, {status: "working"}); S.threadSig = job.id + "working"; renderComposer(); loadQueue();
+}
 async function act(what, body, ok) {
   try { await api(`/api/clients/${S.sel.key}/threads/${encodeURIComponent(S.sel.tid)}/${what}`, body); toast(ok + " (queued for Claude)"); }
   catch (e) { toast(e.message, true); }
@@ -254,54 +340,130 @@ function confirmSend() {
   dlg.showModal();
 }
 
-// ---------------- brief ----------------
-function renderBrief() {
-  const t = S.thread; if (!t || !S.sel) return;
-  const j = S.jobs[S.sel.tid] || t.job, r = (j && j.result) || {}, b = r.brief || {};
-  const si = STAGES.findIndex(s => s[0] === b.stage);
-  const sec = (h, body) => body ? `<section><div class="b-h">${h}</div>${body}</section>` : "";
-  const metrics = (t.metrics || []).map(m => `<div class="m-card">
-      <div class="m-title">${esc(m["Partner domain"])}${m["Partner page (where we'd be listed)"] && m["Partner page (where we'd be listed)"] !== "(domain)" ? " · " + esc(m["Partner page (where we'd be listed)"]) : ""}</div>
-      <table class="mt">${[["Partner DR", m["Partner DR"]], ["Domain traffic/mo", m["Partner domain traffic/mo"]], ["Page traffic/mo", m["Partner page traffic/mo"]],
-        ["AI retrievals", m["AI retrievals (MaxVisibility)"]], ["Our page", m["Our page (where partner goes)"]], ["Our DR", m["Our DR"]], ["Our page traffic/mo", m["Our page traffic/mo"]]]
-        .filter(x => x[1]).map(([k, v]) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`).join("")}</table>
-      ${m["Deal / verdict"] ? `<div class="verdict">${esc(m["Deal / verdict"])}</div>` : ""}<div class="m">${esc(m["Date checked"])} · ${esc(m["Source"])}</div></div>`).join("");
-  const html = `<div class="brief">
-    ${si >= 0 ? sec("Stage", `<div class="stage">${STAGES.map((s, i) => `<i class="${i <= si ? "on" : ""}"></i>`).join("")}</div><div class="stage-l"><b>${STAGES[si][1]}</b><span>${si + 1} of 5</span></div>`) : ""}
-    ${sec("In short", r.summary ? `<div class="b-p">${esc(r.summary)}</div>` : `<div class="b-p m">No brief yet. It is written with the draft.</div>`)}
-    ${sec("Your call", r.needs_user_decision && r.decision_question ? `<div class="decide">${esc(r.decision_question)}</div>` : "")}
-    ${sec("You need to", b.we_must_do ? `<div class="todo">${esc(b.we_must_do)}</div>` : "")}
-    ${sec("They want", b.they_want ? `<div class="b-p">${esc(b.they_want)}</div>` : "")}
-    ${sec("Checks", (b.checks || []).length ? `<div class="checks">${b.checks.map(x => `<div class="ck ${x.ok === true ? "ok" : x.ok === false ? "no" : "unk"}"><span class="i">${x.ok === true ? "✓" : x.ok === false ? "✗" : "?"}</span><span>${esc(x.text)}</span></div>`).join("")}</div>` : "")}
-    ${sec("What happened", (b.timeline || []).length ? `<ul class="tl">${b.timeline.map(x => `<li><span class="d">${esc(x.date)}</span>${esc(x.text)}</li>`).join("")}</ul>` : "")}
-    ${sec("Partner metrics", metrics || `<div class="b-p m">Not checked yet. No row for this partner in the client's “Ahrefs – Partner Checks” sheet.</div>`)}
-    ${sec("Links", (b.links || []).length ? `<div class="links">${b.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}</div>` : "")}
-  </div>`;
-  $("#rail").innerHTML = html;
-  const bi = $("#briefInline"); if (bi) bi.innerHTML = html;
-  const bs = $("#biS"); if (bs) bs.textContent = (r.needs_user_decision && r.decision_question ? "Your call: " + r.decision_question : r.summary || "");
+// ---------------- right panel: link comparison · recap · Ask Claude ----------------
+const numOf = v => { const s = String(v ?? "").replace(/,/g, "").trim().toLowerCase(); const m = s.match(/^([\d.]+)\s*([km])?/); if (!m) return null; return parseFloat(m[1]) * (m[2] === "k" ? 1e3 : m[2] === "m" ? 1e6 : 1); };
+function renderCtx() {
+  const t = S.thread; if (!t || !S.sel) { $("#ctx").innerHTML = ""; return; }
+  const j = S.jobs[S.sel.tid] || t.job, r = (j && j.result) || {}, b = r.brief || {}, r0 = rowOf(S.sel.tid) || {};
+  const m = (t.metrics || [])[0];
+  const dom = r0.domain || (m && m["Partner domain"]) || "";
+  // 1 · link comparison
+  let cmp;
+  if (m) {
+    const rows = [["Domain rating", m["Partner DR"], m["Our DR"]],
+      ["Traffic / mo", m["Partner page traffic/mo"] || m["Partner domain traffic/mo"], m["Our page traffic/mo"]],
+      ["AI visibility", m["AI retrievals (MaxVisibility)"], m["Our AI retrievals"] || ""]].filter(x => x[1] || x[2]);
+    const cell = (a, o) => { const x = numOf(a), y = numOf(o); return `<td class="${x != null && y != null && x > y ? "win" : ""}">${esc(a || "–")}</td>`; };
+    // verdict: amber only when Claude flagged a decision; otherwise the sheet's deal note, shown as-is
+    const vText = r.needs_user_decision && r.decision_question ? ["check", "Check before sending", r.decision_question]
+      : m["Deal / verdict"] ? ["note", "Deal", m["Deal / verdict"]] : r.draft_body ? ["go", "Good to send", r.summary || ""] : null;
+    const theirPage = m["Partner page (where we'd be listed)"] && m["Partner page (where we'd be listed)"] !== "(domain)" ? m["Partner page (where we'd be listed)"] : "";
+    const href = u => /^https?:/i.test(u) ? u : "https://" + u;
+    cmp = `${vText ? `<div class="verdict ${vText[0]}"><b>${esc(vText[1])}</b>${esc(vText[2])}</div>` : ""}
+      <table class="cmp"><thead><tr><th></th><th>Their page</th><th>Our page</th></tr></thead><tbody>
+      ${rows.map(([l, a, o]) => `<tr><td>${l}</td>${cell(a, o)}${cell(o, a)}</tr>`).join("")}</tbody></table>
+      <div class="pg">${theirPage ? `<span>Their page</span><a href="${esc(href(theirPage))}" target="_blank" rel="noopener noreferrer">${esc(theirPage)}</a>` : ""}
+        ${m["Our page (where partner goes)"] ? `<span>Our page</span><a href="${esc(href(m["Our page (where partner goes)"]))}" target="_blank" rel="noopener noreferrer">${esc(m["Our page (where partner goes)"])}</a>` : ""}</div>
+      <div class="asof">From the client sheet · ${esc([m["Date checked"], m["Source"]].filter(Boolean).join(" · ") || "date not logged")}</div>`;
+  } else {
+    cmp = (r.needs_user_decision && r.decision_question ? `<div class="verdict check"><b>Check before sending</b>${esc(r.decision_question)}</div>` : "") +
+      `<p class="none">Not checked yet. No row for ${esc(dom || "this partner")} in the client's “Ahrefs – Partner Checks” sheet.</p>`;
+  }
+  // 2 · recap
+  const tl = b.timeline || [];
+  const steps = tl.map(x => `<div class="step done"><i></i><span>${esc(x.text)} <small>· ${esc(x.date)}</small></span></div>`).join("") +
+    (b.we_must_do ? `<div class="step now"><i></i><span>${esc(b.we_must_do)}</span></div>` : "");
+  const story = b.story || r.summary || "";
+  const call = r.needs_user_decision && r.decision_question ? r.decision_question : b.we_must_do || b.they_want || "";
+  $("#ctx").innerHTML = `
+    <section class="box"><div class="ch"><span>The two links</span><span>${esc(dom)}</span></div>${cmp}
+      <button class="btn ah" id="ahBtn" title="Asks Claude to propose the exact check; nothing runs until you confirm">Refresh from Ahrefs…</button></section>
+    <section class="box rc"><div class="ch"><span>Recap</span></div>
+      ${steps ? `<h4>So far</h4><div class="steps">${steps}</div>` : ""}
+      ${story ? `<h4>The story</h4><p class="story">${esc(story)}</p>` : ""}
+      ${call ? `<h4>Your call</h4><p class="call">${esc(call)}</p>` : ""}
+      ${!steps && !story && !call ? `<p class="none">No recap yet. It is written with the draft.</p>` : ""}
+    </section>
+    <section class="box chat"><div class="ch"><span>Ask Claude about this email</span><span>${esc(dom)}</span></div>
+      <div class="cm" id="chatLog"></div>
+      <form class="cq" id="chatForm"><input id="chatIn" placeholder="Ask anything about this thread…" aria-label="Ask Claude about this email" autocomplete="off"><button class="cs" aria-label="Send">↑</button></form>
+    </section>`;
+  $("#ahBtn").onclick = askAhrefs;
+  $("#chatForm").onsubmit = sendChat;
+  renderChat();
+}
+async function askAhrefs() {
+  const r0 = rowOf(S.sel.tid) || {}, dom = r0.domain || "";
+  if (!confirm(`Ask Claude to prepare an Ahrefs check for ${dom || "this partner"}?\n\nClaude replies here with the exact pages and Ahrefs units first. Nothing is pulled until you confirm in this chat.`)) return;
+  await chatReq(`Prepare an Ahrefs check for ${dom} (their page and our page in this thread). Reply with the exact targets, metrics and units first; do not call Ahrefs until I confirm.`);
+}
+const pendingChat = [];
+async function chatReq(text) {
+  try {
+    await window.whenAuthed;
+    const {error} = await SB.from("requests").insert({type: "chat", client: S.sel.key, thread_id: S.sel.tid, payload: {text, page: "reply", thread_id: S.sel.tid}});
+    if (error) throw error;
+    pendingChat.push({tid: S.sel.tid, q: text}); renderChat();
+  } catch (e) { toast("Not sent: " + (e.message || e), true); }
+}
+async function sendChat(e) {
+  e.preventDefault();
+  const inp = $("#chatIn"), text = inp.value.trim(); if (!text) return;
+  inp.value = ""; await chatReq(text);
+}
+function renderChat() {
+  const box = $("#chatLog"); if (!box || !S.sel) return;
+  const tid = S.sel.tid;
+  const log = (S.chat || []).filter(m => m.thread_id === tid);
+  const open = (S.reqs || []).filter(r => r.type === "chat" && (r.thread_id === tid || (r.payload || {}).thread_id === tid));
+  for (let i = pendingChat.length - 1; i >= 0; i--) if (log.some(m => m.q === pendingChat[i].q) || open.some(r => (r.payload || {}).text === pendingChat[i].q)) pendingChat.splice(i, 1);
+  const items = [];
+  log.forEach((m, i) => { items.push(`<div class="bub me">${esc(m.q)}</div>`);
+    items.push(`<div class="bub ai">${esc(m.a)}<button class="use" data-i="${i}">Redraft the reply with this</button></div>`); });
+  open.forEach(r => items.push(`<div class="bub me">${esc((r.payload || {}).text)}</div>`));
+  pendingChat.filter(p => p.tid === tid).forEach(p => items.push(`<div class="bub me">${esc(p.q)}</div>`));
+  if (open.length || pendingChat.some(p => p.tid === tid)) items.push(`<div class="bub w">${S.online ? "Claude is answering…" : "Claude is offline; answered at the next desk run (7:25 / 1:25)."}</div>`);
+  if (!items.length) items.push(`<div class="hint">Ask about this partner, their pages or what to reply. Claude answers here, and one click turns the answer into a new draft.</div>`);
+  const atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.innerHTML = items.join("");
+  if (atEnd) box.scrollTop = box.scrollHeight;
+  box.querySelectorAll(".use").forEach(btn => btn.onclick = async () => {
+    const m = log[+btn.dataset.i]; btn.disabled = true;
+    try { const j = S.jobs[S.sel.tid] || (S.thread || {}).job; await redraft(`Follow this advice: ${m.a}`, !!(j && j.result)); toast("Redraft asked for"); }
+    catch (e) { toast(e.message, true); btn.disabled = false; }
+  });
 }
 
 // ---------------- rules & decisions ----------------
 async function openKnow() {
   const k = await api("/api/knowledge");
-  $("#knowBody").innerHTML = `<div class="row" style="justify-content:space-between"><h2>Rules &amp; decisions</h2><button class="btn ghost sm" id="kClose">Close</button></div>
-    <div class="m">Every draft reads these rules, the memory notes (${esc(k.memory_files.join(", "))}) and the client state in ${esc(k.handover)}.</div>
-    <div class="k-grid"><div><div class="b-h">Learned rules</div><textarea id="learned">${esc(k.learned)}</textarea><div class="row end" style="margin-top:8px"><button class="btn primary sm" id="saveL">Save rules</button></div></div>
-    <div><div class="b-h">Decision log · ${k.decisions.length}</div><ul class="k-log">${k.decisions.map(d => `<li><b>${esc(d.client)} · ${esc(d.action)}</b> <span class="m">${esc(d.ts.slice(0, 16).replace("T", " "))}</span><div class="m">${esc(d.subject)}${d.edited ? " · edited before send" : ""}</div>${d.instruction ? `<div class="m">“${esc(d.instruction)}”</div>` : ""}</li>`).join("") || '<li class="m">No decisions yet.</li>'}</ul></div></div>`;
+  $("#knowBody").innerHTML = `<div class="row" style="justify-content:space-between"><h2>Rules &amp; decisions</h2><button class="btn" id="kClose">Close</button></div>
+    <div class="m">Every draft reads these rules, the memory notes (${esc((k.memory_files || []).join(", "))}) and the client state in ${esc(k.handover)}.</div>
+    <div class="k-grid"><div><div class="ch"><span>Learned rules</span></div><textarea id="learned">${esc(k.learned)}</textarea><div class="row end" style="margin-top:8px"><button class="btn pri" id="saveL">Save rules</button></div></div>
+    <div><div class="ch"><span>Decision log · ${(k.decisions || []).length}</span></div><ul class="k-log">${(k.decisions || []).map(d => `<li><b>${esc(d.client)} · ${esc(d.action)}</b> <span class="m">${esc((d.ts || "").slice(0, 16).replace("T", " "))}</span><div class="m">${esc(d.subject)}${d.edited ? " · edited before send" : ""}</div>${d.instruction ? `<div class="m">“${esc(d.instruction)}”</div>` : ""}</li>`).join("") || '<li class="m">No decisions yet.</li>'}</ul></div></div>`;
   $("#kClose").onclick = () => $("#know").close();
   $("#saveL").onclick = async () => { await api("/api/knowledge/learned", {text: $("#learned").value}); toast("Rules saved"); };
   $("#know").showModal();
 }
 
-$("#qSearch").oninput = e => { S.search = e.target.value; $("#qClear").hidden = !S.search; loadQueue(); };
-$("#qSearch").onkeydown = e => { if (e.key === "Escape") { e.target.value = ""; S.search = ""; $("#qClear").hidden = true; loadQueue(); } };
-$("#qClear").onclick = e => { e.preventDefault(); $("#qSearch").value = ""; S.search = ""; $("#qClear").hidden = true; loadQueue(); $("#qSearch").focus(); };
+// ---------------- wiring ----------------
+$("#qSearch").oninput = e => { S.search = e.target.value; loadQueue(); };
+$("#qSearch").onkeydown = e => { if (e.key === "Escape") { e.target.value = ""; S.search = ""; $("#searchBox").hidden = true; loadQueue(); } };
+$("#searchBtn").onclick = () => { const b = $("#searchBox"); b.hidden = !b.hidden; if (!b.hidden) $("#qSearch").focus(); else { $("#qSearch").value = ""; S.search = ""; loadQueue(); } };
 $("#openKnow").onclick = openKnow;
 $("#pullOne").onclick = async () => {
-  if (!S.client) { await api("/api/refresh-all", {}); toast("Pull queued for all clients"); return; }
-  await api(`/api/clients/${S.client}/refresh`, {}); toast("Pull queued");
+  try { if (!S.client) { await api("/api/refresh-all", {}); toast("Pull queued for all clients"); return; }
+    await api(`/api/clients/${S.client}/refresh`, {}); toast("Pull queued"); } catch (e) { toast(e.message, true); }
 };
+document.querySelectorAll(".views button").forEach(b => b.onclick = () => setView(b.dataset.v));
+document.addEventListener("keydown", e => {
+  if (e.target.closest && e.target.closest("input,textarea,dialog,[contenteditable]")) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "j") { e.preventDefault(); step(1); }
+  else if (e.key === "k") { e.preventDefault(); step(-1); }
+  else if (e.key === "s" && S.sel) { e.preventDefault(); skipThis(); }
+  else if (e.key === "/") { e.preventDefault(); $("#searchBox").hidden = false; $("#qSearch").focus(); }
+});
 S.client = new URLSearchParams(location.search).get("c") || "";
 Shell.mount("reply", S.client, k => pickClient(k));
 tick(); setInterval(tick, 3500);

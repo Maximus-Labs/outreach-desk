@@ -1,38 +1,47 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Outreach Desk · Reply desk</title>
+<title>Outreach Desk · Reply</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
 <script src="shell.js"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600&family=Geist+Mono:wght@400;500&family=Roboto:wght@400;500&display=swap">
 <link rel="stylesheet" href="desk.css">
 </head><body>
 <div class="app" id="app">
-  <!-- 1. Sidebar: home + clients -->
-  <nav class="sb" id="sb" aria-label="Views"></nav>
+  <!-- 1 · icon rail (opens on hover) -->
+  <nav class="rail" aria-label="Views"><div class="rail-in" id="rail"></div></nav>
 
-  <!-- 2. Reply queue -->
-  <section class="queue" aria-label="Reply queue">
-    <header class="q-head">
-      <div><h1 id="qTitle">All clients</h1><div class="q-sub" id="qSub"></div></div>
-      <span class="q-tools"><button class="icon-btn" id="openKnow" title="Rules and decision log" aria-label="Rules and decision log">≡</button><button class="icon-btn" id="pullOne" title="Pull this client from Gmail" aria-label="Pull from Gmail">↻</button></span>
-    </header>
-    <label class="q-search"><span aria-hidden="true">⌕</span><input id="qSearch" type="search" placeholder="Search name, company, subject…" aria-label="Search the queue"><button id="qClear" hidden aria-label="Clear search">✕</button></label>
-    <div class="q-tabs" id="qTabs" role="tablist" aria-label="Thread status"></div>
-    <div class="q-scroll" id="qList"></div>
+  <!-- 2 · received emails -->
+  <section class="list" aria-label="Received emails">
+    <div class="lh">
+      <div class="lh-t"><h1 id="qTitle">Received emails</h1><div class="sub"><span class="sync" id="sync"><i></i><span id="syncTxt">Loading…</span></span> · <span id="qSub"></span></div></div>
+      <span class="tools">
+        <button class="ib" id="searchBtn" title="Search  /" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
+        <button class="ib" id="pullOne" title="Pull from Gmail" aria-label="Pull from Gmail"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg></button>
+        <button class="ib" id="openKnow" title="Rules and decision log" aria-label="Rules and decision log"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg></button>
+      </span>
+    </div>
+    <label class="search" id="searchBox" hidden><input id="qSearch" type="search" placeholder="Search name, company, subject…" aria-label="Search the list"></label>
+    <div class="banner" id="banner" hidden></div>
+    <div class="views" role="tablist" aria-label="View"><button class="on" data-v="all" role="tab">All open</button><button data-v="today" role="tab">Today</button></div>
+    <div class="tabs" id="qTabs" role="tablist" aria-label="Thread status"></div>
+    <div class="scroll" id="qList"></div>
+    <div class="today" id="today" hidden></div>
   </section>
 
-  <!-- 3. Workspace: composer on top, Gmail thread below -->
-  <main class="work" id="work"><div class="empty-state"><div class="es-t">Pick an email from the queue</div><div class="es-s">The brief on the right tells you what happened and what to do. Drafts made by the scheduled run are already in the composer.</div></div></main>
+  <!-- 3 · reply area -->
+  <main class="work" id="work">
+    <div class="empty"><b>Pick an email on the left</b><span>The reply Claude drafted opens here, with the link comparison and the recap on the right.</span></div>
+  </main>
 
-  <!-- 4. Brief rail -->
-  <aside class="rail" id="rail" aria-label="Brief"></aside>
+  <!-- 4 · about this email -->
+  <aside class="ctx" id="ctx" aria-label="About this email"></aside>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <dialog id="confirm"><form method="dialog" class="dlg">
   <h2>Send this reply?</h2><div class="m" id="cfMeta"></div><pre class="cf-body" id="cfBody"></pre>
-  <div class="row end"><button class="btn ghost" value="cancel">Cancel</button><button class="btn primary" value="send">Send now</button></div>
+  <div class="row end"><button class="btn" value="cancel">Cancel</button><button class="btn pri" value="send">Send now</button></div>
 </form></dialog>
 <dialog id="know" class="wide"><div class="dlg" id="knowBody"></div></dialog>
 <script src="desk.js"></script>
