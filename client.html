@@ -21,7 +21,7 @@ a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline} a:fo
 .head small{color:var(--text3);font-size:12.5px}
 .badge{font:12px var(--mono);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);border-radius:999px;padding:4px 10px;white-space:nowrap}
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.otag{display:block;margin-top:3px;font:11.5px/1.35 var(--body)} .otag.us{color:var(--yes)} .otag.client{color:var(--wip)}
+.otag{display:block;margin-top:3px;font:11.5px/1.35 var(--body)} .otag.us{color:var(--yes)} .otag.co{color:var(--acc)} .otag.client{color:var(--wip)}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:4px;align-content:start}
 .kpi span{font-size:13px;color:var(--text2)} .kpi b{font:500 38px/1.05 var(--mono);font-variant-numeric:tabular-nums} .kpi small{font-size:12px;color:var(--text3)}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
@@ -98,14 +98,18 @@ function render(c) {
   $("k2").textContent = c.replies;
   $("k3").textContent = c.exchanges.length; $("k3s").textContent = `live · ${c.agreed} agreed and on the way`;
   chart(c.days || {}, c.started);
+  const ORIGIN = { client_only: ["Client-led", "client", "Your team did this exchange end to end."],
+    client: ["Co-led", "co", "Your team started it; MaximusLabs finished it."],
+    us: ["MaximusLabs-led", "us", "MaximusLabs did this exchange end to end."] };
+  const cnt = k => new Set(c.exchanges.filter(x => x.origin === k).map(x => x.partner)).size;
+  if (c.exchanges.some(x => ORIGIN[x.origin])) $("ex-note").textContent = `Partners: Client-led ${cnt("client_only")} · Co-led ${cnt("client")} · MaximusLabs-led ${cnt("us")}`;
   const groups = [];   // one partner cell, then every pair of pages with that partner
   for (const x of c.exchanges) { let g = groups.find(y => y.p === x.partner); if (!g) groups.push(g = { p: x.partner, rows: [] }); g.rows.push(x); }
   groups.forEach(g => g.rows.sort((a, b) => (a.live || "").localeCompare(b.live || "")));
   groups.sort((a, b) => b.rows.length - a.rows.length || (b.rows.at(-1).live || "").localeCompare(a.rows.at(-1).live || ""));
   $("ex").replaceChildren(...(groups.length ? groups.flatMap(g => g.rows.map((x, i) => el("tr", { class: i ? "" : "g0" },
       i ? null : el("td", { class: "p", rowspan: String(g.rows.length) }, el("b", { text: g.p }), el("small", { text: `${g.rows.length} exchange${g.rows.length > 1 ? "s" : ""}` }),
-        g.rows[0].origin === "us" ? el("small", { class: "otag us", text: "By MaximusLabs" })
-        : g.rows[0].origin === "client" ? el("small", { class: "otag client", text: "Started by your team · finished by MaximusLabs" }) : null),
+        ORIGIN[g.rows[0].origin] ? el("small", { class: `otag ${ORIGIN[g.rows[0].origin][1]}`, text: ORIGIN[g.rows[0].origin][0], title: ORIGIN[g.rows[0].origin][2] }) : null),
       el("td", { class: "d", "data-l": "Date", text: x.live ? pretty(x.live) : (x.month || "") }),
       el("td", { "data-l": "Their page (lists you)" }, link(x.their_url)), el("td", { "data-l": "Your page (lists them)" }, link(x.our_url)))))
     : [el("tr", {}, el("td", { colspan: "4", class: "empty", text: "None yet. Exchanges appear here once both pages are published." }))]));
