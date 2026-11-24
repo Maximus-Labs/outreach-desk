@@ -82,6 +82,9 @@ function rowStatus(r) {
   if (r.job === "working") return ["Drafting", "var(--acc)", true];
   if (r.job === "error") return ["Failed", "var(--red)"];
   if (r.outdated) return ["New email", "var(--amber)"];
+  if (r.unreported) return ["Not in report", "var(--amber)"];
+  if (r.newer) return ["New email", "var(--amber)"];
+  if (r.check) return [`${r.stage || "They wrote"} · check`, "var(--text2)"];
   if (r.followup) return [`Follow-up · ${Math.round(r.age_days)} days`, "var(--text3)"];
   if (r.bucket === "our" && r.age_days >= 3) return [`Late · ${Math.round(r.age_days)} days`, "var(--red)"];
   if (r.decision) return ["Your call", "var(--amber)"];
@@ -183,9 +186,11 @@ async function loadQueue() {
   let html;
   if (!list.length) html = `<div class="empty-l">${term ? `No match for “${esc(S.search)}” here.` : {reply: "Nothing needs a reply. ✓", client: "Nobody to wait on.", done: "No completed exchanges yet.", paid: "No paid-only replies.", other: "Nothing else."}[tab]}</div>`;
   else if (tab === "reply") {
-    const now = list.filter(r => !r.followup), fu = list.filter(r => r.followup);
-    html = (now.length ? `<div class="grp"><span>Needs reply</span><span>${now.length}</span></div>` + now.map(row).join("") : "") +
-           (fu.length ? `<div class="grp"><span>Follow-up due</span><span>${fu.length}</span></div>` + fu.map(row).join("") : "");
+    const G = replyGroups(list), sec = (t, rs, hint) => rs.length ? `<div class="grp" ${hint ? `title="${hint}"` : ""}><span>${t}</span><span>${rs.length}</span></div>` + rs.map(row).join("") : "";
+    html = sec("Needs reply", G.now) +
+      sec("Not in the monitoring report", G.unrep, "Partner replies in the mailbox that the monitoring report did not list (different subject line)") +
+      sec("They wrote last · report says no reply", G.check, "The partner wrote last; the monitoring report judged no reply is needed. Skip it if that's right.") +
+      sec("Follow-up due", G.fu);
   } else html = list.map(row).join("");
   $("#qList").innerHTML = html;
   document.querySelectorAll("#qList .qi").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
@@ -207,7 +212,9 @@ function setView(v) {
   S.view = v; document.querySelectorAll(".views button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   $("#qList").hidden = v === "today"; $("#qTabs").hidden = v === "today"; $("#today").hidden = v !== "today";
 }
-const flatList = () => { const v = (S.view_q || {})[S.tab] || []; return S.tab === "reply" ? [...v.filter(r => !r.followup), ...v.filter(r => r.followup)] : v; };
+const replyGroups = l => ({now: l.filter(r => !r.followup && !r.unreported && !r.check), unrep: l.filter(r => r.unreported),
+  check: l.filter(r => r.check && !r.unreported), fu: l.filter(r => r.followup && !r.unreported && !r.check)});
+const flatList = () => { const v = (S.view_q || {})[S.tab] || []; if (S.tab !== "reply") return v; const G = replyGroups(v); return [...G.now, ...G.unrep, ...G.check, ...G.fu]; };
 function step(d) {
   const l = flatList(); if (!l.length) return;
   const i = S.sel ? l.findIndex(r => r.thread_id === S.sel.tid) : -1, r = l[Math.min(l.length - 1, Math.max(0, i + d))];
