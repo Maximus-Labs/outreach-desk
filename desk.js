@@ -170,10 +170,10 @@ async function loadQueue() {
   S.view_q = view;
   const c = (S.overview && S.overview.clients || []).find(x => x.key === S.client);
   $("#qTitle").textContent = c ? c.name : "Received emails";
-  $("#qSub").textContent = `${q.reply.length} need a reply`;
+  $("#qSub").textContent = `${q.reply.filter(r => !r.check).length} need a reply`;
   $("#pullOne").title = c ? `Pull ${c.name} from Gmail` : "Pull all clients from Gmail";
   const tab = S.tab;
-  $("#qTabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}<b>${view[k].length}</b></button>`).join("");
+  $("#qTabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}<b>${k === "reply" ? view[k].filter(r => !r.check).length : view[k].length}</b></button>`).join("");
   document.querySelectorAll("#qTabs button").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; loadQueue(); });
   const row = r => {
     const [st, col, busy] = rowStatus(r), sel = S.sel && S.sel.tid === r.thread_id;
