@@ -113,8 +113,9 @@ async function tick() {
     }
     for (const tid of Object.keys(S.jobs)) if (S.jobs[tid].status === "sending" && !next[tid]) toast("Sent · " + (S.jobs[tid].subject || ""));
     S.jobs = next;
-    const [ov, chat, cl] = await Promise.all([api("/api/overview"), snap("chat"), S.clients.length ? null : snap("clients")]);
+    const [ov, chat, cl, mc] = await Promise.all([api("/api/overview"), snap("chat"), S.clients.length ? null : snap("clients"), snap("mail_counts")]);
     S.overview = ov; S.chat = chat || []; if (cl) S.clients = cl;
+    S.mc = mc && mc.at && Date.now() - new Date(mc.at) < 3 * 3600e3 ? mc : null;  // cloud mail counts, used while fresh (< 3 h)
     await loadQueue();
     renderRail();
     if (S.sel) { const jb = S.jobs[S.sel.tid]; const sig = jb ? jb.id + jb.status : "none";
@@ -125,7 +126,8 @@ async function tick() {
 function setSync(ok, e) {
   const s = $("#sync"), b = $("#banner"), t = S.lastOk ? S.lastOk.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}) : "";
   s.className = "sync " + (ok ? "ok" : "err");
-  $("#syncTxt").textContent = ok ? `Synced ${t}${S.online ? "" : " · Claude offline"}` : (t ? `Using ${t} data` : "Not loaded");
+  const mct = S.mc ? new Date(S.mc.at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}) : "";
+  $("#syncTxt").textContent = ok ? `Synced ${t}${mct ? ` · mail checked ${mct}` : ""}${S.online ? "" : " · Claude offline"}` : (t ? `Using ${t} data` : "Not loaded");
   b.hidden = ok;
   if (!ok) b.textContent = `Couldn't refresh${e && e.message ? ` (${e.message.slice(0, 80)})` : ""}. ${t ? `Showing data from ${t}.` : ""} Retrying…`;
 }
@@ -134,7 +136,9 @@ function setSync(ok, e) {
 function renderRail() {
   const ov = (S.overview && S.overview.clients) || [], q = S.queue || {reply: []};
   const allQ = S.allReply || q.reply || [];
-  const total = ov.reduce((a, c) => a + (c.reply || 0), 0);  // c.reply = partner emails waiting on us + follow-ups due (server)
+  // count = partner emails waiting on us + follow-ups due: from the cloud mail check when fresh, else the desk's own view
+  const cnt = k => S.mc ? ((S.mc.clients || {})[k] || {}).total || 0 : ((ov.find(c => c.key === k) || {}).reply || 0);
+  const total = ov.reduce((a, c) => a + cnt(c.key), 0);
   const late = k => allQ.some(r => r.client === k && r.bucket === "our" && r.age_days >= 3);
   const item = (cls, href, ic, label, ct, extra = "") => `<a class="ri ${cls}" href="${href}" ${extra}>${ic}<span>${label}</span><span class="ct">${ct || ""}</span></a>`;
   $("#rail").innerHTML =
@@ -144,7 +148,7 @@ function renderRail() {
     item("", "settings.html", `<span class="ic">${ICON.gear}</span>`, "Settings") +
     `<div class="sep"></div>` +
     item(S.client ? "" : "on", "desk.html", `<span class="lg all">All</span>`, "All clients", total, 'data-k=""') +
-    ov.map(c => `<a class="ri ${S.client === c.key ? "on" : ""}" href="desk.html?c=${esc(c.key)}" data-k="${esc(c.key)}" title="${esc(c.name)}">${logo(c.key, c.name)}${late(c.key) ? '<i class="dot" aria-label="late replies"></i>' : ""}<span>${esc(c.name)}</span><span class="ct">${c.reply || ""}</span></a>`).join("") +
+    ov.map(c => `<a class="ri ${S.client === c.key ? "on" : ""}" href="desk.html?c=${esc(c.key)}" data-k="${esc(c.key)}" title="${esc(c.name)}">${logo(c.key, c.name)}${late(c.key) ? '<i class="dot" aria-label="late replies"></i>' : ""}<span>${esc(c.name)}</span><span class="ct">${cnt(c.key) || ""}</span></a>`).join("") +
     `<div class="rail-foot">` +
     `<a class="ri" href="#" id="askBtn"><span class="ic">${ICON.spark}</span><span>Ask Claude</span></a>` +
     `<a class="ri" href="#" id="outBtn"><span class="ic">${ICON.out}</span><span>Sign out</span></a></div>`;
@@ -163,6 +167,18 @@ async function loadQueue() {
   const want = S.client;
   const [q, all] = await Promise.all([api("/api/queue" + (want ? `?client=${want}` : "")), want ? api("/api/queue") : null]);
   if (want !== S.client) return;
+  if (S.mc) {  // the counted rows come from the cloud mail check; desk rows add drafts / status where they exist
+    const byId = {}; for (const k of ["reply", "client", "done", "paid", "other"]) (q[k] || []).forEach(r => byId[r.thread_id] = r);
+    const ids = new Set(), names = Object.fromEntries((S.overview.clients || []).map(c => [c.key, c.name]));
+    const mrows = (S.mc.rows || []).filter(r => !want || r.client === want).map(r => { ids.add(r.thread_id);
+      const d = byId[r.thread_id] || {}, t = r.kind === "reply" ? r.last_them_at : r.last_us_at;
+      return Object.assign({}, d, {client: r.client, client_name: names[r.client] || r.client_name, thread_id: r.thread_id,
+        who: d.who || r.who || r.domain, domain: r.domain, subject: d.subject || r.subject, ts: Date.parse(t) / 1000,
+        age_days: (Date.now() - Date.parse(t)) / 864e5, stage: d.stage || r.stage, bucket: "our", followup: r.kind === "followup",
+        unreported: false, check: false, mc: true}); });
+    q.reply = [...mrows, ...(q.reply || []).filter(r => (r.unreported || r.check) && !ids.has(r.thread_id))];
+    for (const k of ["client", "done", "paid", "other"]) q[k] = (q[k] || []).filter(r => !ids.has(r.thread_id));
+  }
   S.allReply = (all || q).reply; S.queue = q;
   const term = S.search.trim().toLowerCase();
   const view = {};
