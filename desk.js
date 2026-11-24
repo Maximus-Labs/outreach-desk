@@ -133,7 +133,7 @@ function setSync(ok, e) {
 function renderRail() {
   const ov = (S.overview && S.overview.clients) || [], q = S.queue || {reply: []};
   const allQ = S.allReply || q.reply || [];
-  const total = ov.reduce((a, c) => a + (c.reply || 0), 0);
+  const total = ov.reduce((a, c) => a + (c.reply || 0), 0);  // c.reply = partner emails waiting on us + follow-ups due (server)
   const late = k => allQ.some(r => r.client === k && r.bucket === "our" && r.age_days >= 3);
   const item = (cls, href, ic, label, ct, extra = "") => `<a class="ri ${cls}" href="${href}" ${extra}>${ic}<span>${label}</span><span class="ct">${ct || ""}</span></a>`;
   $("#rail").innerHTML =
