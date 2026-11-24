@@ -89,6 +89,7 @@ function rowStatus(r) {
   if (r.bucket === "our" && r.age_days >= 3) return [`Late · ${Math.round(r.age_days)} days`, "var(--red)"];
   if (r.decision) return ["Your call", "var(--amber)"];
   const st = r.stage || "";
+  if (/waiting on our work/i.test(st)) return [st, "var(--amber)"];
   if (/live/i.test(st)) return [st, "var(--green)"];
   if (/counter|different|paid/i.test(st)) return [st, "var(--violet)"];
   if (/draft|blurb/i.test(st)) return [st, "var(--amber)"];
@@ -170,10 +171,10 @@ async function loadQueue() {
   S.view_q = view;
   const c = (S.overview && S.overview.clients || []).find(x => x.key === S.client);
   $("#qTitle").textContent = c ? c.name : "Received emails";
-  $("#qSub").textContent = `${q.reply.filter(r => !r.check).length} need a reply`;
+  $("#qSub").textContent = `${q.reply.filter(r => !r.check && !r.unreported).length} need a reply`;
   $("#pullOne").title = c ? `Pull ${c.name} from Gmail` : "Pull all clients from Gmail";
   const tab = S.tab;
-  $("#qTabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}<b>${k === "reply" ? view[k].filter(r => !r.check).length : view[k].length}</b></button>`).join("");
+  $("#qTabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}<b>${k === "reply" ? view[k].filter(r => !r.check && !r.unreported).length : view[k].length}</b></button>`).join("");
   document.querySelectorAll("#qTabs button").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; loadQueue(); });
   const row = r => {
     const [st, col, busy] = rowStatus(r), sel = S.sel && S.sel.tid === r.thread_id;
@@ -188,7 +189,7 @@ async function loadQueue() {
   else if (tab === "reply") {
     const G = replyGroups(list), sec = (t, rs, hint) => rs.length ? `<div class="grp" ${hint ? `title="${hint}"` : ""}><span>${t}</span><span>${rs.length}</span></div>` + rs.map(row).join("") : "";
     html = sec("Needs reply", G.now) +
-      sec("Not in the monitoring report", G.unrep, "Partner replies in the mailbox that the monitoring report did not list (different subject line)") +
+      sec("Other partner emails · not counted", G.unrep, "Partner emails outside our link-exchange proposals (different subject line). Shown for a glance; not counted.") +
       sec("They wrote last · report says no reply", G.check, "The partner wrote last; the monitoring report judged no reply is needed. Skip it if that's right.") +
       sec("Follow-up due", G.fu);
   } else html = list.map(row).join("");
