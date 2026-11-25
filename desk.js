@@ -137,7 +137,8 @@ function renderRail() {
   const ov = (S.overview && S.overview.clients) || [], q = S.queue || {reply: []};
   const allQ = S.allReply || q.reply || [];
   // count = partner emails waiting on us + follow-ups due: from the cloud mail check when fresh, else the desk's own view
-  const cnt = k => S.mc ? ((S.mc.clients || {})[k] || {}).total || 0 : ((ov.find(c => c.key === k) || {}).reply || 0);
+  const pend = k => S.mc ? (S.mc.rows || []).filter(r => r.client === k && isMarked(r.thread_id)).length : 0;
+  const cnt = k => S.mc ? Math.max(0, (((S.mc.clients || {})[k] || {}).total || 0) - pend(k)) : ((ov.find(c => c.key === k) || {}).reply || 0);
   const total = ov.reduce((a, c) => a + cnt(c.key), 0);
   const late = k => allQ.some(r => r.client === k && r.bucket === "our" && r.age_days >= 3);
   const item = (cls, href, ic, label, ct, extra = "") => `<a class="ri ${cls}" href="${href}" ${extra}>${ic}<span>${label}</span><span class="ct">${ct || ""}</span></a>`;
@@ -170,7 +171,7 @@ async function loadQueue() {
   if (S.mc) {  // the counted rows come from the cloud mail check; desk rows add drafts / status where they exist
     const byId = {}; for (const k of ["reply", "client", "done", "paid", "other"]) (q[k] || []).forEach(r => byId[r.thread_id] = r);
     const ids = new Set(), names = Object.fromEntries((S.overview.clients || []).map(c => [c.key, c.name]));
-    const mrows = (S.mc.rows || []).filter(r => !want || r.client === want).map(r => { ids.add(r.thread_id);
+    const mrows = (S.mc.rows || []).filter(r => (!want || r.client === want) && !isMarked(r.thread_id)).map(r => { ids.add(r.thread_id);
       const d = byId[r.thread_id] || {}, t = r.kind === "reply" ? r.last_them_at : r.last_us_at;
       return Object.assign({}, d, {client: r.client, client_name: names[r.client] || r.client_name, thread_id: r.thread_id,
         who: d.who || r.who || r.domain, domain: r.domain, subject: d.subject || r.subject, ts: Date.parse(t) / 1000,
@@ -207,10 +208,11 @@ async function loadQueue() {
     html = sec("Needs reply", G.now) +
       sec("Other partner emails · not counted", G.unrep, "Partner emails outside our link-exchange proposals (different subject line). Shown for a glance; not counted.") +
       sec("They wrote last · report says no reply", G.check, "The partner wrote last; the monitoring report judged no reply is needed. Skip it if that's right.") +
-      sec("Follow-up due", G.fu);
+      sec("Follow-up due", G.fu) + markedSection(S.client);
   } else html = list.map(row).join("");
   $("#qList").innerHTML = html;
-  document.querySelectorAll("#qList .qi").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
+  document.querySelectorAll("#qList .qi:not(.mk)").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
+  document.querySelectorAll("#qList .undo").forEach(b => b.onclick = e => { e.stopPropagation(); undoMark(b.dataset.k, b.dataset.t); });
   renderToday();
 }
 function renderToday() {
@@ -293,13 +295,65 @@ function renderWork() {
 function wireHead() {
   $("#back").onclick = () => $("#app").classList.remove("reading");
   $("#nextBtn").onclick = () => step(1);
-  $("#skipTop").onclick = () => skipThis();
+  $("#skipTop").onclick = e => { e.stopPropagation(); skipThis(e.currentTarget); };
   $("#ctxBtn").onclick = () => $("#app").classList.toggle("ctx-open");
 }
-function skipThis() {
+// ---------------- Skip with a reason (paid / declined / no reply / later) ----------------
+S.marks = {};   // thread_id -> {reason, until, at, client}: clicks the cloud mail check has not seen yet
+S.undone = {};  // thread_id -> at: undo clicks not yet seen
+const REASONS = {paid: "Paid placement", declined: "Declined / not a fit", no_reply: "No reply needed", later: "Later"};
+const isMarked = tid => { const m = S.marks[tid]; return !!(m && (!S.mc || Date.parse(S.mc.at) < m.at)); };
+const ymd = d => d.toISOString().slice(0, 10);
+function skipThis(anchor) {
   if (!S.sel) return;
-  if (!confirm("Skip this email? It is logged as 'no reply needed'.")) return;
-  act("skip", {reason: ($("#instr") || {}).value || ""}, "Skipped and logged");
+  let pop = $("#skipPop");
+  if (!pop) { pop = document.createElement("div"); pop.id = "skipPop"; pop.className = "pop"; document.body.append(pop); }
+  const t1 = new Date(Date.now() + 864e5), t3 = new Date(Date.now() + 3 * 864e5);
+  pop.innerHTML = `<div class="pop-h">Skip this email · it leaves the count</div>
+    <button data-r="paid">Paid placement <small>closed for good</small></button>
+    <button data-r="declined">Declined / not a fit <small>closed for good</small></button>
+    <button data-r="no_reply">No reply needed <small>back if they write again</small></button>
+    <div class="pop-h">Later · comes back on the date</div>
+    <div class="pop-row"><button data-r="later" data-u="${ymd(t1)}">Tomorrow</button><button data-r="later" data-u="${ymd(t3)}">In 3 days</button>
+      <input type="date" id="laterDate" min="${ymd(t1)}" aria-label="Pick a date"><button id="laterGo">Set</button></div>`;
+  const r = (anchor || $("#skipTop")).getBoundingClientRect();
+  pop.style.top = (r.bottom + 6) + "px";
+  pop.style.left = Math.max(8, Math.min(innerWidth - 300, r.right - 280)) + "px";
+  pop.hidden = false;
+  const pick = (reason, until) => { pop.hidden = true; markThread(reason, until); };
+  pop.querySelectorAll("button[data-r]").forEach(b => b.onclick = () => pick(b.dataset.r, b.dataset.u || ""));
+  $("#laterGo").onclick = () => { const v = $("#laterDate").value; if (v) pick("later", v); };
+  setTimeout(() => document.addEventListener("click", function off(e) {
+    if (!pop.contains(e.target)) { pop.hidden = true; document.removeEventListener("click", off); } }), 0);
+}
+async function markThread(reason, until) {
+  const {key, tid} = S.sel;
+  try {
+    await api(`/api/clients/${key}/threads/${encodeURIComponent(tid)}/skip`, {reason, until, label: REASONS[reason]});
+    S.marks[tid] = {reason, until, at: Date.now(), client: key};
+    toast(`${REASONS[reason]}${until ? " · back " + until : ""} · removed from the count`);
+    await loadQueue(); renderRail(); step(1);
+  } catch (e) { toast(e.message, true); }
+}
+async function undoMark(key, tid) {
+  try {
+    await addReq("skip", key, tid, {reason: "undo"});
+    delete S.marks[tid]; S.undone[tid] = Date.now();
+    toast("Undone · back in the count at the next mail check (within 30 min)");
+    await loadQueue(); renderRail();
+  } catch (e) { toast(e.message, true); }
+}
+function markedSection(want) {
+  const fresh = S.mc ? Date.parse(S.mc.at) : 0, parked = (S.mc && S.mc.parked) || [];
+  const local = Object.entries(S.marks).filter(([tid]) => isMarked(tid) && !parked.some(p => p.thread_id === tid))
+    .map(([tid, m]) => { const r = ((S.mc && S.mc.rows) || []).find(x => x.thread_id === tid) || {};
+      return {thread_id: tid, client: m.client, who: r.who || r.domain || "This email", domain: r.domain || "", kind: m.reason, until: m.until}; });
+  const rows = [...parked.filter(p => !(S.undone[p.thread_id] > fresh)), ...local].filter(p => !want || p.client === want);
+  if (!rows.length) return "";
+  const lab = p => p.kind === "later" ? `Later · back ${esc(String(p.until || "").slice(0, 10))}` : esc(REASONS[p.kind] || "Skipped");
+  return `<div class="grp" title="Emails you marked. Not counted. Paid and declined stay closed; Later comes back on its date."><span>Marked by you · not counted</span><span>${rows.length}</span></div>` +
+    rows.map(p => `<div class="qi mk"><span class="av">${esc(initials(p.who))}</span><span class="who"><b>${esc(p.who)}</b><span>${esc(p.domain)}</span></span>
+      <span class="meta"><span class="st">${lab(p)}${p.new_since ? " · new email" : ""}</span><button class="undo" data-k="${esc(p.client)}" data-t="${esc(p.thread_id)}">Undo</button></span></div>`).join("");
 }
 
 function renderComposer() {
@@ -333,7 +387,7 @@ function renderComposer() {
     box.querySelectorAll(".gm-s button").forEach(b => b.onclick = () => { $("#instr").value = b.textContent; $("#instr").focus(); });
     const ta = $("#body"); ta.style.height = Math.max(220, ta.scrollHeight + 6) + "px";
   }
-  const sk = $("#skip"); if (sk) sk.onclick = () => skipThis();
+  const sk = $("#skip"); if (sk) sk.onclick = e => { e.stopPropagation(); skipThis(e.currentTarget); };
   const go = $("#go"), inp = $("#instr");
   const start = async () => {
     go.disabled = true;
@@ -492,7 +546,7 @@ document.addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === "j") { e.preventDefault(); step(1); }
   else if (e.key === "k") { e.preventDefault(); step(-1); }
-  else if (e.key === "s" && S.sel) { e.preventDefault(); skipThis(); }
+  else if (e.key === "s" && S.sel) { e.preventDefault(); skipThis($("#skipTop")); }
   else if (e.key === "/") { e.preventDefault(); $("#searchBox").hidden = false; $("#qSearch").focus(); }
 });
 S.client = new URLSearchParams(location.search).get("c") || "";

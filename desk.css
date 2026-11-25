@@ -214,3 +214,16 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   .wh .back{display:inline-flex}
   .wh{flex-wrap:wrap;padding:10px 14px;gap:8px} .wh .t{flex:1 1 160px} .wh .acts{margin-left:0;width:100%} .wh .k{display:none}
 }
+
+/* Skip menu + marked list */
+.pop{position:fixed;z-index:80;width:290px;background:#141414;border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.55)}
+.pop[hidden]{display:none}
+.pop-h{font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text3);padding:8px 8px 4px}
+.pop button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:8px;border-radius:8px;color:var(--text);font-size:13px}
+.pop button:hover{background:var(--hover)} .pop button small{color:var(--text3);font-size:11px}
+.pop-row{display:flex;gap:4px;padding:2px 4px 6px;align-items:center}
+.pop-row button{width:auto;flex:none;border:1px solid var(--line);padding:5px 8px;font-size:12px}
+.pop-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:4px;font:12px var(--font);color-scheme:dark}
+.qi.mk{cursor:default;opacity:.85}
+.qi.mk .undo{margin-top:4px;font-size:11.5px;color:var(--acc);border:1px solid var(--line);border-radius:6px;padding:1px 8px}
+.qi.mk .undo:hover{background:var(--hover)}
