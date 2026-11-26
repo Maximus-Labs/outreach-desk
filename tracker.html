@@ -23,7 +23,7 @@ a{color:var(--sky);text-decoration:none}
 .side-foot a{color:var(--text3)}
 
 /* Google Sheets look */
-.sheet{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;min-height:0;background:#fff;color:var(--g-text);font-family:Roboto,Arial,sans-serif;color-scheme:light}
+.sheet{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;background:#fff;color:var(--g-text);font-family:Roboto,Arial,sans-serif;color-scheme:light}
 .title{display:flex;align-items:center;gap:12px;padding:10px 16px 6px}
 .ico{width:24px;height:30px;border-radius:3px;background:#0f9d58;position:relative;flex:none}
 .ico::after{content:"";position:absolute;left:5px;right:5px;top:9px;bottom:6px;border:2px solid #fff;border-radius:1px;background:linear-gradient(#fff 0 0) 50%/2px 100% no-repeat,linear-gradient(#fff 0 0) 50%/100% 2px no-repeat}
@@ -64,7 +64,6 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
 <div class="shell">
   <nav class="sb" id="sb" aria-label="Views"></nav>
   <section class="sheet" aria-label="Outreach Tracker">
-    <div class="title"><span class="ico" aria-hidden="true"></span><div><h1 id="ttl">Outreach Tracker</h1><div class="sub" id="tsub"></div></div><span class="sp"></span><a class="open" id="openSheet" target="_blank" rel="noopener">Open in Google Sheets</a></div>
     <div class="bar">
       <label class="search"><span aria-hidden="true">⌕</span><input id="q" type="search" placeholder="Search this sheet" aria-label="Search this sheet"></label>
       <button class="chip" data-f="replied" aria-pressed="false">Replied</button>
@@ -75,7 +74,6 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
     <div class="grid-wrap" id="wrap"><div class="msg">Loading the tracker…</div></div>
     <div>
       <div class="cellbox" id="cell"><b>Cell</b>Click a cell to see its full text.</div>
-      <div class="tabs" role="tablist" id="tabs"></div>
     </div>
   </section>
 </div>
@@ -91,15 +89,9 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
   const st = {client: new URLSearchParams(location.search).get("c") || "easywebinar", rows: null, at: "", sort: null, f: {}, q: ""};
   const cache = {};
 
-  function tabs() {
-    $("tabs").innerHTML = CLIENTS.map(([k, n, sid]) => `<button class="tab" role="tab" data-k="${k}" aria-selected="${k === st.client}" ${sid ? "" : "disabled title=\"No Outreach Tracker tab in this client's sheet\""}>${esc(n)}</button>`).join("");
-    document.querySelectorAll(".tab:not([disabled])").forEach(b => b.onclick = () => { st.client = b.dataset.k; history.replaceState(null, "", "?c=" + st.client); Shell.setClient(st.client); load(); });
-  }
-  async function load() {
-    tabs();
+  async function load() {  // the client is picked in the left sidebar
     const c = CLIENTS.find(x => x[0] === st.client) || CLIENTS[0];
-    $("ttl").textContent = `${c[1]} · Outreach Tracker`;
-    $("openSheet").href = c[2] ? `https://docs.google.com/spreadsheets/d/${c[2]}/edit` : "#";
+    document.title = `${c[1]} · Outreach Tracker · Outreach Desk`;
     if (!cache[c[0]]) {
       $("wrap").innerHTML = '<div class="msg">Loading the tracker…</div>';
       await window.whenAuthed;
@@ -108,8 +100,8 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
       cache[c[0]] = data;
     }
     st.rows = cache[c[0]].rows; st.at = cache[c[0]].updated_at;
-    $("tsub").textContent = "Copied from the client's sheet · " + new Date(st.at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
-    $("updated").textContent = "Copied " + new Date(st.at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+    st.copied = new Date(st.at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+    const up = $("updated"); if (up) up.textContent = "Copied " + st.copied;
     render();
   }
   function render() {
@@ -131,7 +123,7 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
       <thead><tr><th class="rn"></th>${head.map((h, i) => `<th class="${i === 0 ? "c0" : ""}">${col(i)}</th>`).join("")}</tr>
       <tr class="hdr"><th class="rn">1</th>${head.map((h, i) => `<th class="${i === 0 ? "c0" : ""}" data-sort="${i}" title="Sort by ${esc(h)}">${esc(h)}${st.sort && st.sort[0] === i ? (st.sort[1] > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead>
       <tbody>${list.map(x => `<tr><td class="rn">${x.n}</td>${head.map((_, ci) => cell(x.r[ci], ci)).join("")}</tr>`).join("")}</tbody></table>`;
-    $("count").textContent = `${list.length} of ${body.length} rows`;
+    $("count").textContent = `${list.length} of ${body.length} rows${st.copied ? " · copied " + st.copied : ""}`;
     document.querySelectorAll("[data-sort]").forEach(th => th.onclick = () => { const c = +th.dataset.sort; st.sort = st.sort && st.sort[0] === c ? (st.sort[1] > 0 ? [c, -1] : null) : [c, 1]; render(); });
     $("wrap").querySelector("tbody").onclick = e => { const td = e.target.closest("td[data-c]"); if (!td || e.target.tagName === "A") return;
       document.querySelectorAll("td.sel").forEach(x => x.classList.remove("sel")); td.classList.add("sel");
