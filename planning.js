@@ -54,19 +54,24 @@
     $("mmSave").title = st.store === "ok" ? "Save for the whole team" : "Saving is off until planning.sql has run in Supabase";
     $("mmMeta").textContent = (st.planAt ? `Saved ${fmtT(st.planAt)}${st.planBy ? " by " + st.planBy.split("@")[0] : ""}` : "Not saved yet")
       + (st.hasDraft ? " · unsaved draft on this browser" : "") + " · Level 1 = widest market at the top, each level down = narrower. Number = pitch order."
-      + (ed ? " Click a box to edit it, drag it to move it." : "");
+      + (ed ? " Click a box to edit it. Drag a box and a dashed line shows where it will land." : "");
     const kids = id => p.nodes.filter(n => (n.parent || null) === id);
-    const box = (n, d) => `<div class="nd ${esc(n.color)}${n.here ? " here" : ""}${ed && st.sel === n.id ? " sel" : ""}" data-id="${n.id}" ${ed ? 'role="button" tabindex="0" draggable="true"' : ""}
-        title="${esc(ed ? "Drag onto another box to connect it under that box" : [n.name, n.kw, colorName(n.color)].filter(Boolean).join(" · "))}">${n.num ? `<span class="no">${esc(n.num)}</span>` : ""}<span class="lv">Level ${d}</span>
+    const box = (n, d) => `<div class="nd ${esc(n.color)}${n.here ? " here" : ""}${ed && st.sel === n.id ? " sel" : ""}" data-id="${n.id}" ${ed ? 'role="button" tabindex="0"' : ""}
+        title="${esc(ed ? "Drag to move it under another box · click to edit" : [n.name, n.kw, colorName(n.color)].filter(Boolean).join(" · "))}">${n.num ? `<span class="no">${esc(n.num)}</span>` : ""}<span class="lv">Level ${d}</span>
         <span class="nm">${esc(n.name || "Untitled")}</span>${n.kw ? `<span class="kw">${esc(n.kw)}</span>` : ""}${n.here ? '<i class="pin" aria-label="We are here"></i>' : ""}
         ${ed ? `<span class="nd-x" data-x="${n.id}" role="button" tabindex="0" title="Remove this box" aria-label="Remove ${esc(n.name || "box")}">×</span>` : ""}</div>`;
     const li = (n, d = 1) => { const ch = kids(n.id); return `<li>${box(n, d)}${ch.length ? `<ul>${ch.map(c => li(c, d + 1)).join("")}</ul>` : ""}</li>`; };
     const roots = kids(null);
     $("tree").className = ed ? "ed" : "";
     $("palette").hidden = !ed;
-    if (ed) $("palette").innerHTML = `<span class="pal-l">Add a box</span>` + PAL.map(([c, l]) => `<button type="button" class="pal" draggable="true" data-new="${c}"><i class="dot ${c}"></i>${l}</button>`).join("")
-      + `<button type="button" class="pal" draggable="true" data-here="1"><i class="ring"></i>We are here</button>`
-      + `<span class="pal-hint">Drag a chip onto a box to add it under that box. Click a chip to add under the selected box.</span>`;
+    if (ed) $("palette").innerHTML = `<span class="pal-l">Add a box</span>` + PAL.map(([c, l]) => `<button type="button" class="pal" data-new="${c}"><i class="dot ${c}"></i>${l}</button>`).join("")
+      + `<button type="button" class="pal" data-here="1"><i class="ring"></i>We are here</button>`
+      + `<span class="pal-hint">Drag a chip onto a box, or click it to add under the selected box.</span>`;
+    const tray = p.nodes.filter(n => n.parent === "tray");
+    $("tray").hidden = !ed || !tray.length;
+    $("tray").innerHTML = tray.length ? `<span class="tray-l">New boxes · type a name, then drag into the map</span>` + tray.map(n => `<div class="nd tnd ${esc(n.color)}" data-id="${n.id}">
+        <span class="grip" aria-hidden="true">⋮⋮</span><input class="tin" data-tin="${n.id}" value="${esc(n.name)}" placeholder="Type a name" aria-label="Box name">
+        <span class="nd-x" data-x="${n.id}" role="button" tabindex="0" title="Remove" aria-label="Remove box">×</span></div>`).join("") : "";
     $("tree").innerHTML = roots.length ? `<ul class="org">${roots.map(n => li(n)).join("")}</ul>`
       : `<div class="tree-empty"><b style="color:var(--t2)">No market map yet</b><span>${ed ? "Add the widest market first, then branch narrower markets under it." : "Press Edit and start with the widest market at the top."}</span></div>`;
     fitTree(); drawNodeEd();
@@ -122,54 +127,97 @@
   }
   function bindMap() {
     const t = $("tree"), nb = $("nodeEd");
-    t.addEventListener("click", e => { if (!st.editing) return; const x = e.target.closest(".nd-x"); if (x) { e.stopPropagation(); removeNode(x.dataset.x); return; }
+    t.addEventListener("click", e => { if (!st.editing || st.justDragged) return; const x = e.target.closest(".nd-x"); if (x) { e.stopPropagation(); removeNode(x.dataset.x); return; }
       const b = e.target.closest(".nd"); if (!b) return; st.sel = b.dataset.id; drawMap(); nb.querySelector("input")?.focus(); });
     t.addEventListener("keydown", e => { if (!st.editing || (e.key !== "Enter" && e.key !== " " && e.key !== "Delete")) return;
       const x = e.target.closest(".nd-x"), b = e.target.closest(".nd"); if (!b) return; e.preventDefault();
       if (x || e.key === "Delete") removeNode(b.dataset.id); else { st.sel = b.dataset.id; drawMap(); nb.querySelector("input")?.focus(); } });
-    // ---- drag and drop ----
-    // st.drag = {kind:"move", id} | {kind:"new", color} | {kind:"here"}. While dragging over a box, a dashed
-    // "Goes here" box with dashed lines shows under it (level + parent named), so you see where it will land.
-    const pal = $("palette");
-    const addNode = (parent, color) => { const m = {id: uid(), parent, name: "", kw: "", color, num: ""}; st.plan.nodes.push(m); st.sel = m.id; touched(); drawMap();
-      nb.querySelector("input")?.focus(); };
-    pal.addEventListener("click", e => { const c = e.target.closest(".pal"); if (!c) return;
+    // ---- drag and drop (pointer based, like Trello / Miro): press, move 5px, a card follows the cursor,
+    // the box it will go under lights up and an animated dashed line + "goes here" slot shows the level. Esc cancels.
+    const pal = $("palette"), tray = $("tray");
+    const addNode = (parent, color, focusTray) => { const m = {id: uid(), parent, name: "", kw: "", color: color || "", num: ""}; st.plan.nodes.push(m); st.sel = m.id; touched(); drawMap();
+      (focusTray ? tray.querySelector(`[data-tin="${m.id}"]`) : nb.querySelector("input"))?.focus(); return m; };
+    $("addBox").onclick = () => { if (!st.editing) st.editing = true; addNode("tray", "", true); };
+    pal.addEventListener("click", e => { if (st.justDragged) return; const c = e.target.closest(".pal"); if (!c) return;
       if (c.dataset.here) { const n = st.plan.nodes.find(x => x.id === st.sel); if (!n) { alert("Select a box first, or drag 'We are here' onto a box."); return; }
         const on = !n.here; st.plan.nodes.forEach(x => x.here = false); n.here = on; touched(); drawMap(); return; }
-      addNode(st.sel && st.plan.nodes.some(x => x.id === st.sel) ? st.sel : null, c.dataset.new); });
-    pal.addEventListener("dragstart", e => { const c = e.target.closest(".pal"); if (!c) return;
-      st.drag = c.dataset.here ? {kind: "here"} : {kind: "new", color: c.dataset.new}; e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setData("text/plain", "new"); });
-    let ghost = null;
-    const unGhost = () => { if (!ghost) return; const {li, ul, made} = ghost; li.remove(); if (made && !ul.children.length) ul.remove(); ghost = null; };
-    const clear = () => { unGhost(); document.querySelectorAll(".drop-ok,.dragging").forEach(el => el.classList.remove("drop-ok", "dragging")); };
-    const ok = target => { const g = st.drag; if (!g) return false; if (g.kind !== "move") return true; return target !== g.id && !under(target, g.id); };
-    const showGhost = b => {
-      const id = b.dataset.id; if (ghost && ghost.for === id) return; unGhost();
-      document.querySelectorAll(".drop-ok").forEach(el => el.classList.remove("drop-ok")); b.classList.add("drop-ok");
-      if (st.drag.kind === "here") return;
-      const host = b.parentElement; let ul = host.querySelector(":scope>ul"), made = false;
-      if (!ul) { ul = document.createElement("ul"); ul.className = "ghost-ul"; host.append(ul); made = true; }
-      const n = st.plan.nodes.find(x => x.id === id), li = document.createElement("li"); li.className = "ghost";
-      const what = st.drag.kind === "move" ? (st.plan.nodes.find(x => x.id === st.drag.id) || {}).name || "This box" : "New box";
-      li.innerHTML = `<div class="nd-ghost"><b>${esc(what)} goes here</b><small>Level ${depth(id) + 1} · under ${esc(n.name || "Untitled")}</small></div>`;
-      ul.append(li); ghost = {for: id, li, ul, made};
-    };
-    const place = target => { const g = st.drag; st.drag = null; clear(); if (!g) return;
-      if (g.kind === "move") moveNode(g.id, target);
-      else if (g.kind === "new") addNode(target, g.color);
-      else if (g.kind === "here" && target) { st.plan.nodes.forEach(x => x.here = x.id === target); st.sel = target; touched(); drawMap(); } };
-    t.addEventListener("dragstart", e => { const b = e.target.closest(".nd"); if (!b || !st.editing) return; st.drag = {kind: "move", id: b.dataset.id};
-      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", b.dataset.id); requestAnimationFrame(() => b.parentElement.classList.add("dragging")); });
-    t.addEventListener("dragover", e => { if (!st.drag) return; const b = e.target.closest(".nd");
-      if (b && ok(b.dataset.id)) { e.preventDefault(); e.dataTransfer.dropEffect = st.drag.kind === "move" ? "move" : "copy"; showGhost(b); return; }
-      if (ghost || e.target.closest(".ghost")) { e.preventDefault(); } });  // keep the preview while the pointer is near it
-    t.addEventListener("dragleave", e => { if (!t.contains(e.relatedTarget)) clear(); });
-    t.addEventListener("drop", e => { if (!st.drag) return; const b = e.target.closest(".nd");
-      const target = b && ok(b.dataset.id) ? b.dataset.id : ghost ? ghost.for : null; e.preventDefault(); if (target) place(target); else { st.drag = null; clear(); } });
-    document.addEventListener("dragend", () => { st.drag = null; clear(); });
-    nb.addEventListener("dragover", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag || st.drag.kind === "here") return; e.preventDefault(); unGhost(); z.classList.add("drop-ok"); });
-    nb.addEventListener("dragleave", e => { const z = e.target.closest("#rootDrop"); if (z) z.classList.remove("drop-ok"); });
-    nb.addEventListener("drop", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag || st.drag.kind === "here") return; e.preventDefault(); place(null); });
+      const sel = st.plan.nodes.find(x => x.id === st.sel);
+      addNode(sel && sel.parent !== "tray" ? sel.id : "tray", c.dataset.new, !sel || sel.parent === "tray"); });
+    tray.addEventListener("input", e => { const id = e.target.dataset.tin; if (!id) return; const n = st.plan.nodes.find(x => x.id === id); n.name = e.target.value; touched(); });
+    tray.addEventListener("click", e => { const x = e.target.closest(".nd-x"); if (x) removeNode(x.dataset.x); });
+
+    let D = null;  // the drag in progress
+    const overlay = () => { let o = $("dropFx"); if (!o) { o = document.createElement("div"); o.id = "dropFx"; o.innerHTML = '<svg><path/></svg><div class="nd-ghost"></div>'; t.parentElement.append(o); } return o; };
+    const nameOf = id => (st.plan.nodes.find(x => x.id === id) || {}).name || "Untitled";
+    const legal = target => { if (!D) return false; if (D.kind !== "move") return true; return target !== D.id && !under(target, D.id); };
+    function findTarget(x, y) {
+      const rz = $("rootDrop"); if (rz && D.kind !== "here") { const r = rz.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top - 6 && y <= r.bottom + 6) return {root: true, el: rz}; }
+      let best = null, bd = 1e9;
+      t.querySelectorAll(".org .nd[data-id]").forEach(el => { const id = el.dataset.id; if (!legal(id)) return;
+        const r = el.getBoundingClientRect(), pad = 18;  // generous zone: around the box and the gap under it
+        if (x < r.left - pad || x > r.right + pad || y < r.top - pad || y > r.bottom + 26) return;
+        const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, inside = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom, dd = inside ? -1 : Math.hypot(x - cx, (y - cy) * 1.4);
+        if (dd < bd) { bd = dd; best = {id, el}; } });
+      return best;
+    }
+    function showFx(tg) {
+      document.querySelectorAll(".drop-ok").forEach(el => el !== (tg && tg.el) && el.classList.remove("drop-ok"));
+      const o = overlay();
+      if (!tg) { o.hidden = true; return; }
+      tg.el.classList.add("drop-ok");
+      if (tg.root || D.kind === "here") { o.hidden = true; return; }
+      const host = t.parentElement, tr = host.getBoundingClientRect(), r = tg.el.getBoundingClientRect();
+      const x0 = r.left + r.width / 2 - tr.left, y0 = r.bottom - tr.top;
+      // the target already has boxes under it: the slot opens at the end of that row (same level, same cluster)
+      const last = tg.el.parentElement.querySelector(":scope>ul>li:last-child>.nd"), lr = last && last.getBoundingClientRect();
+      const gx = lr ? lr.right - tr.left + 18 : x0, gy = lr ? lr.top - tr.top : y0 + 30, mid = lr ? y0 + (lr.top - r.bottom) / 2 : 0;
+      const what = D.kind === "move" ? nameOf(D.id) : "New box";
+      o.hidden = false; o.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;overflow:visible;pointer-events:none;z-index:5";
+      const svg = o.querySelector("svg"); svg.setAttribute("width", 1); svg.setAttribute("height", 1);
+      const g = o.querySelector(".nd-ghost"); g.style.top = gy + "px"; g.classList.toggle("side", !!lr);
+      g.innerHTML = `<b>${esc(what)}</b><small>goes here · Level ${depth(tg.id) + 1} · under ${esc(nameOf(tg.id))}</small>`;
+      g.style.left = gx + "px";
+      const gw = g.offsetWidth || 160, gc = lr ? gx + gw / 2 : x0;
+      svg.querySelector("path").setAttribute("d", lr ? `M${x0},${y0} V${mid} H${gc} V${gy}` : `M${x0},${y0} V${gy}`);
+
+    }
+    function endDrag(drop) {
+      if (!D) return; const d = D, tg = D.tg; D = null;
+      document.body.classList.remove("is-dragging"); d.float && d.float.remove(); d.srcEl && d.srcEl.classList.remove("lifted");
+      document.querySelectorAll(".drop-ok").forEach(el => el.classList.remove("drop-ok")); const o = $("dropFx"); if (o) o.hidden = true;
+      if (d.started) { st.justDragged = true; setTimeout(() => st.justDragged = false, 50); }
+      if (!drop || !d.started || !tg) return;
+      const target = tg.root ? null : tg.id;
+      if (d.kind === "move") moveNode(d.id, target);
+      else if (d.kind === "new") addNode(target, d.color);
+      else if (d.kind === "here" && target) { st.plan.nodes.forEach(x => x.here = x.id === target); st.sel = target; touched(); drawMap(); }
+    }
+    function startPress(e, info, srcEl) {
+      if (e.button !== 0 || !st.editing) return;
+      D = {...info, x0: e.clientX, y0: e.clientY, started: false, srcEl, tg: null};
+    }
+    document.addEventListener("pointerdown", e => {
+      if (!st.editing || e.target.closest("input,textarea,select,.nd-x")) return;
+      const b = e.target.closest("#tree .org .nd[data-id], #tray .tnd"); if (b) { startPress(e, {kind: "move", id: b.dataset.id}, b); return; }
+      const c = e.target.closest("#palette .pal"); if (c) startPress(e, c.dataset.here ? {kind: "here"} : {kind: "new", color: c.dataset.new}, c);
+    });
+    document.addEventListener("pointermove", e => {
+      if (!D) return;
+      if (!D.started) { if (Math.hypot(e.clientX - D.x0, e.clientY - D.y0) < 5) return;
+        D.started = true; document.body.classList.add("is-dragging"); if (D.srcEl) D.srcEl.classList.add("lifted");
+        const f = document.createElement("div"); f.className = "drag-float " + (D.kind === "new" ? D.color : D.kind === "move" ? (st.plan.nodes.find(x => x.id === D.id) || {}).color || "" : "");
+        f.innerHTML = D.kind === "here" ? '<i class="ring"></i> We are here' : `<b>${esc(D.kind === "move" ? nameOf(D.id) : "New box")}</b>`;
+        document.body.append(f); D.float = f; }
+      e.preventDefault();
+      D.float.style.transform = `translate(${e.clientX + 12}px, ${e.clientY + 10}px) rotate(-2deg)`;
+      const tg = findTarget(e.clientX, e.clientY);
+      if ((tg && tg.id) !== (D.tg && D.tg.id) || !!(tg && tg.root) !== !!(D.tg && D.tg.root)) { D.tg = tg; showFx(tg); }
+      D.float.classList.toggle("ok", !!tg);
+      if (e.clientY < 60) window.scrollBy(0, -14); else if (e.clientY > innerHeight - 60) window.scrollBy(0, 14);  // auto-scroll near the edges
+    }, {passive: false});
+    document.addEventListener("pointerup", () => endDrag(true));
+    document.addEventListener("pointercancel", () => endDrag(false));
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && D) endDrag(false); });
     nb.addEventListener("input", e => { const id = e.target.closest("[data-id]")?.dataset.id, f = e.target.dataset.f; if (!id || !f) return;
       const n = st.plan.nodes.find(x => x.id === id); n[f] = e.target.value; touched(); liveBox(n); });
     nb.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
@@ -187,7 +235,7 @@
           $(f).querySelector(".row-e:last-of-type input")?.focus(); }
         if (b.dataset.act === "del") { st.plan[f].splice(+b.closest("[data-i]").dataset.i, 1); touched(); drawMap(); } });
     }
-    $("mmEdit").onclick = () => { st.editing = !st.editing; if (st.editing && !st.sel) st.sel = (st.plan.nodes[0] || {}).id || null; drawMap(); };
+    $("mmEdit").onclick = () => { st.editing = !st.editing; if (!st.editing) st.plan.nodes = st.plan.nodes.filter(n => n.parent !== "tray" || n.name); if (st.editing && !st.sel) st.sel = (st.plan.nodes[0] || {}).id || null; drawMap(); };
     $("mmSave").onclick = save;
   }
   async function save() {
