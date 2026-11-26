@@ -37,6 +37,8 @@ a{color:var(--sky);text-decoration:none}
 .chip{all:unset;cursor:pointer;font-size:12.5px;color:#444746;border:1px solid #c4c7c5;border-radius:8px;padding:4px 10px;white-space:nowrap}
 .chip[aria-pressed="true"]{background:#d3e3fd;border-color:#d3e3fd;color:#041e49}
 .count{font-size:12.5px;color:#5f6368;margin-left:auto}
+.chip.view{font-weight:500}
+.sheet.articles .chip[data-f]{display:none}
 .grid-wrap{overflow:auto;min-height:0;position:relative}
 table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fixed}
 .g th,.g td{border-right:1px solid var(--g-line);border-bottom:1px solid var(--g-line);height:21px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
@@ -66,6 +68,7 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
   <section class="sheet" aria-label="Outreach Tracker">
     <div class="bar">
       <label class="search"><span aria-hidden="true">⌕</span><input id="q" type="search" placeholder="Search this sheet" aria-label="Search this sheet"></label>
+      <button class="chip view" id="artBtn" aria-pressed="false" title="Our articles changed for link exchanges">Articles</button>
       <button class="chip" data-f="replied" aria-pressed="false">Replied</button>
       <button class="chip" data-f="sent" aria-pressed="false">Email sent</button>
       <button class="chip" data-f="notsent" aria-pressed="false">Not sent yet</button>
@@ -85,12 +88,38 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
   const col = n => { let s = ""; n++; while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
-  const WIDE = /url|people|notes|reason|offers/i, MID = /domain|parent|sequence|status|category|source|batch/i;
-  const st = {client: new URLSearchParams(location.search).get("c") || "easywebinar", rows: null, at: "", sort: null, f: {}, q: ""};
+  const WIDE = /url|people|notes|reason|offers|article|partner page|what we added/i, MID = /domain|parent|sequence|status|category|source|batch/i;
+  const st = {client: new URLSearchParams(location.search).get("c") || "easywebinar", rows: null, at: "", sort: null, f: {}, q: "",
+    view: new URLSearchParams(location.search).get("v") === "articles" ? "articles" : "tracker"};
+  const SLUG = {easywebinar: "easywebinar", versatile: "versatile-club", luca: "luca", oliv: "oliv-ai", maximuslabs: "maximuslabs", teamvoy: "teamvoy"};
+  const LED = {client_only: "Client-led", client: "Co-led", us: "MaximusLabs-led"};
+  const fmtD = d => { if (!d) return ""; const t = new Date(d + "T00:00:00"); return isNaN(t) ? d : t.toLocaleDateString([], {day: "numeric", month: "short", year: "numeric"}); };
+  // Articles: one row per page pair, grouped by OUR article (the page on the client's site that now lists the partner)
+  function articleRows(site) {
+    const pairs = [];
+    for (const x of site.exchanges || []) {
+      const t = String(x.their_url || "").split(/\n+/).map(u => u.trim()).filter(Boolean), o = String(x.our_url || "").split(/\n+/).map(u => u.trim()).filter(Boolean);
+      const n = Math.max(1, t.length, o.length);
+      for (let i = 0; i < n; i++) pairs.push({our: o[i] || "", their: t[i] || "", partner: x.partner, live: x.live || "", month: x.month || "", origin: x.origin || ""});
+    }
+    const by = {};
+    for (const p of pairs) (by[p.our || "(not added on our side yet)"] = by[p.our || "(not added on our side yet)"] || []).push(p);
+    const head = ["Our article", "Partners added", "Partner", "What we added", "Partner page (lists us)", "Live since", "Led by"];
+    const rows = [];
+    Object.entries(by).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])).forEach(([our, list]) => {
+      list.sort((a, b) => (b.live || "").localeCompare(a.live || ""));
+      list.forEach((p, i) => rows.push([our, i ? "" : String(list.length), p.partner, our.startsWith("(") ? "" : "Listed " + p.partner + " with a link",
+        p.their, p.live ? fmtD(p.live) : (p.month || "Earlier"), LED[p.origin] || ""]));
+    });
+    return [head, ...rows];
+  }
   const cache = {};
 
   async function load() {  // the client is picked in the left sidebar
     const c = CLIENTS.find(x => x[0] === st.client) || CLIENTS[0];
+    document.querySelector(".sheet").classList.toggle("articles", st.view === "articles");
+    $("artBtn").setAttribute("aria-pressed", st.view === "articles");
+    if (st.view === "articles") return loadArticles(c);
     document.title = `${c[1]} · Outreach Tracker · Outreach Desk`;
     if (!cache[c[0]]) {
       $("wrap").innerHTML = '<div class="msg">Loading the tracker…</div>';
@@ -102,6 +131,21 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
     st.rows = cache[c[0]].rows; st.at = cache[c[0]].updated_at;
     st.copied = new Date(st.at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
     const up = $("updated"); if (up) up.textContent = "Copied " + st.copied;
+    render();
+  }
+  async function loadArticles(c) {
+    document.title = `${c[1]} · Articles · Outreach Desk`;
+    const key = "art:" + c[0];
+    if (!cache[key]) {
+      $("wrap").innerHTML = '<div class="msg">Loading the articles…</div>';
+      await window.whenAuthed;
+      const {data, error} = await SB.from("sheet_tabs").select("rows,updated_at").eq("tab", "site:" + SLUG[c[0]]).maybeSingle();
+      if (error || !data) { $("wrap").innerHTML = `<div class="msg">${error ? esc(error.message) : "No exchange data for this client yet."}</div>`; $("count").textContent = ""; return; }
+      cache[key] = {rows: articleRows(data.rows || {}), updated_at: data.updated_at};
+    }
+    st.rows = cache[key].rows; st.at = cache[key].updated_at; st.sort = null;
+    st.copied = new Date(st.at).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+    if (st.rows.length < 2) { $("wrap").innerHTML = '<div class="msg">No live exchanges yet, so no articles changed.</div>'; $("count").textContent = ""; return; }
     render();
   }
   function render() {
@@ -123,15 +167,19 @@ table.g{border-collapse:separate;border-spacing:0;font-size:13px;table-layout:fi
       <thead><tr><th class="rn"></th>${head.map((h, i) => `<th class="${i === 0 ? "c0" : ""}">${col(i)}</th>`).join("")}</tr>
       <tr class="hdr"><th class="rn">1</th>${head.map((h, i) => `<th class="${i === 0 ? "c0" : ""}" data-sort="${i}" title="Sort by ${esc(h)}">${esc(h)}${st.sort && st.sort[0] === i ? (st.sort[1] > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead>
       <tbody>${list.map(x => `<tr><td class="rn">${x.n}</td>${head.map((_, ci) => cell(x.r[ci], ci)).join("")}</tr>`).join("")}</tbody></table>`;
-    $("count").textContent = `${list.length} of ${body.length} rows${st.copied ? " · copied " + st.copied : ""}`;
+    $("count").textContent = st.view === "articles"
+      ? `${new Set(body.map(r => r[0])).size} articles · ${body.length} partner links${st.copied ? " · updated " + st.copied : ""}`
+      : `${list.length} of ${body.length} rows${st.copied ? " · copied " + st.copied : ""}`;
     document.querySelectorAll("[data-sort]").forEach(th => th.onclick = () => { const c = +th.dataset.sort; st.sort = st.sort && st.sort[0] === c ? (st.sort[1] > 0 ? [c, -1] : null) : [c, 1]; render(); });
     $("wrap").querySelector("tbody").onclick = e => { const td = e.target.closest("td[data-c]"); if (!td || e.target.tagName === "A") return;
       document.querySelectorAll("td.sel").forEach(x => x.classList.remove("sel")); td.classList.add("sel");
       const rn = td.parentElement.firstElementChild.textContent; $("cell").innerHTML = `<b>${col(+td.dataset.c)}${rn} · ${esc(head[+td.dataset.c])}</b>${esc(td.title)}`; };
   }
   $("q").oninput = e => { st.q = e.target.value; render(); };
-  document.querySelectorAll(".chip").forEach(b => b.onclick = () => { st.f[b.dataset.f] = !st.f[b.dataset.f]; if (b.dataset.f === "sent" && st.f.sent) st.f.notsent = false; if (b.dataset.f === "notsent" && st.f.notsent) st.f.sent = false;
-    document.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", !!st.f[x.dataset.f])); render(); });
+  $("artBtn").onclick = () => { st.view = st.view === "articles" ? "tracker" : "articles"; st.sort = null;
+    history.replaceState(null, "", "?c=" + st.client + (st.view === "articles" ? "&v=articles" : "")); load(); };
+  document.querySelectorAll(".chip[data-f]").forEach(b => b.onclick = () => { st.f[b.dataset.f] = !st.f[b.dataset.f]; if (b.dataset.f === "sent" && st.f.sent) st.f.notsent = false; if (b.dataset.f === "notsent" && st.f.notsent) st.f.sent = false;
+    document.querySelectorAll(".chip[data-f]").forEach(x => x.setAttribute("aria-pressed", !!st.f[x.dataset.f])); render(); });
   Shell.mount("tracker", st.client, k => { st.client = k; load(); });
   load();
 })();
