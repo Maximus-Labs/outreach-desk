@@ -7,7 +7,7 @@ body{font-family:Inter,Geist,system-ui,-apple-system,"Segoe UI",Arial,sans-serif
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .mono{font-family:"Geist Mono",ui-monospace,monospace}
 .muted{color:var(--t3)}.small{font-size:12.5px}
-.shell{display:grid;grid-template-columns:auto minmax(0,1fr);min-height:100vh}
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
 .pl{padding:28px 28px 96px;display:grid;gap:20px;align-content:start;min-width:0;max-width:1280px}
 .pl-head{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap}
 .eyebrow{margin:0 0 4px;font:500 11px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--t3)}
