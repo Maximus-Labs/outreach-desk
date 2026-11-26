@@ -44,6 +44,8 @@
   }
 
   // ---------- 1. market map: widest market on top, narrower ones branch down ----------
+  const PAL = [["green", "Direct competitor"], ["yellow", "Adjacent"], ["red", "Don't pitch"], ["", "Blank"]];
+  const depth = id => { let d = 0, p = id; while (p) { d++; p = (st.plan.nodes.find(x => x.id === p) || {}).parent; } return d; };
   const colorName = c => (COLORS.find(x => x[0] === (c || "")) || [])[1];
   function drawMap() {
     const p = st.plan, ed = st.editing;
@@ -51,17 +53,21 @@
     $("mmSave").hidden = !ed; $("mmSave").disabled = st.store !== "ok";
     $("mmSave").title = st.store === "ok" ? "Save for the whole team" : "Saving is off until planning.sql has run in Supabase";
     $("mmMeta").textContent = (st.planAt ? `Saved ${fmtT(st.planAt)}${st.planBy ? " by " + st.planBy.split("@")[0] : ""}` : "Not saved yet")
-      + (st.hasDraft ? " · unsaved draft on this browser" : "") + " · Top = widest market, each branch down = narrower. Number = pitch order."
-      + (ed ? " Click a box to edit it." : "");
+      + (st.hasDraft ? " · unsaved draft on this browser" : "") + " · Level 1 = widest market at the top, each level down = narrower. Number = pitch order."
+      + (ed ? " Click a box to edit it, drag it to move it." : "");
     const kids = id => p.nodes.filter(n => (n.parent || null) === id);
-    const box = n => `<div class="nd ${esc(n.color)}${n.here ? " here" : ""}${ed && st.sel === n.id ? " sel" : ""}" data-id="${n.id}" ${ed ? 'role="button" tabindex="0" draggable="true"' : ""}
-        title="${esc(ed ? "Drag onto another box to connect it under that box" : [n.name, n.kw, colorName(n.color)].filter(Boolean).join(" · "))}">${n.num ? `<span class="no">${esc(n.num)}</span>` : ""}
+    const box = (n, d) => `<div class="nd ${esc(n.color)}${n.here ? " here" : ""}${ed && st.sel === n.id ? " sel" : ""}" data-id="${n.id}" ${ed ? 'role="button" tabindex="0" draggable="true"' : ""}
+        title="${esc(ed ? "Drag onto another box to connect it under that box" : [n.name, n.kw, colorName(n.color)].filter(Boolean).join(" · "))}">${n.num ? `<span class="no">${esc(n.num)}</span>` : ""}<span class="lv">Level ${d}</span>
         <span class="nm">${esc(n.name || "Untitled")}</span>${n.kw ? `<span class="kw">${esc(n.kw)}</span>` : ""}${n.here ? '<i class="pin" aria-label="We are here"></i>' : ""}
         ${ed ? `<span class="nd-x" data-x="${n.id}" role="button" tabindex="0" title="Remove this box" aria-label="Remove ${esc(n.name || "box")}">×</span>` : ""}</div>`;
-    const li = n => { const ch = kids(n.id); return `<li>${box(n)}${ch.length ? `<ul>${ch.map(li).join("")}</ul>` : ""}</li>`; };
+    const li = (n, d = 1) => { const ch = kids(n.id); return `<li>${box(n, d)}${ch.length ? `<ul>${ch.map(c => li(c, d + 1)).join("")}</ul>` : ""}</li>`; };
     const roots = kids(null);
     $("tree").className = ed ? "ed" : "";
-    $("tree").innerHTML = roots.length ? `<ul class="org">${roots.map(li).join("")}</ul>`
+    $("palette").hidden = !ed;
+    if (ed) $("palette").innerHTML = `<span class="pal-l">Add a box</span>` + PAL.map(([c, l]) => `<button type="button" class="pal" draggable="true" data-new="${c}"><i class="dot ${c}"></i>${l}</button>`).join("")
+      + `<button type="button" class="pal" draggable="true" data-here="1"><i class="ring"></i>We are here</button>`
+      + `<span class="pal-hint">Drag a chip onto a box to add it under that box. Click a chip to add under the selected box.</span>`;
+    $("tree").innerHTML = roots.length ? `<ul class="org">${roots.map(n => li(n)).join("")}</ul>`
       : `<div class="tree-empty"><b style="color:var(--t2)">No market map yet</b><span>${ed ? "Add the widest market first, then branch narrower markets under it." : "Press Edit and start with the widest market at the top."}</span></div>`;
     fitTree(); drawNodeEd();
     drawList("nonpr", "Add source"); drawList("pr", "Add PR outlet");
@@ -83,8 +89,8 @@
         <div class="row"><button type="button" class="btn sm" data-act="child">+ Narrower market under this</button><button type="button" class="btn sm ghost" data-act="sib">+ Same level</button>
           <button type="button" class="btn sm danger" data-act="del" style="margin-left:auto">Remove</button></div></div>` : "")
       + `<div class="tree-acts"><button type="button" class="btn sm ghost" data-act="root">+ Add top (widest) market</button>
-          <div class="rootdrop" id="rootDrop">Drop a box here to make it a top market</div></div>
-        <p class="muted small" style="margin:0">Drag a box onto another box to connect it underneath. × removes a box; boxes under it move up one level.</p>`;
+          <div class="rootdrop" id="rootDrop">Drop here to make it a Level 1 (top) market</div></div>
+        <p class="muted small" style="margin:0">Drag a box onto another box to move it under that box (it takes everything under it along). × removes a box; boxes under it move up one level.</p>`;
   }
   function drawList(f, ph) {
     const list = st.plan[f] || [], ed = st.editing;
@@ -121,19 +127,49 @@
     t.addEventListener("keydown", e => { if (!st.editing || (e.key !== "Enter" && e.key !== " " && e.key !== "Delete")) return;
       const x = e.target.closest(".nd-x"), b = e.target.closest(".nd"); if (!b) return; e.preventDefault();
       if (x || e.key === "Delete") removeNode(b.dataset.id); else { st.sel = b.dataset.id; drawMap(); nb.querySelector("input")?.focus(); } });
-    // drag and drop: drop a box on another box = connect under it; on the strip below = top market
-    const clear = () => document.querySelectorAll(".drop-ok,.dragging").forEach(el => el.classList.remove("drop-ok", "dragging"));
-    const ok = target => st.drag && target !== st.drag && !under(target, st.drag);
-    t.addEventListener("dragstart", e => { const b = e.target.closest(".nd"); if (!b || !st.editing) return; st.drag = b.dataset.id;
-      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", st.drag); b.classList.add("dragging"); });
-    t.addEventListener("dragover", e => { const b = e.target.closest(".nd"); if (!b || !ok(b.dataset.id)) return; e.preventDefault(); e.dataTransfer.dropEffect = "move";
-      document.querySelectorAll(".drop-ok").forEach(el => el !== b && el.classList.remove("drop-ok")); b.classList.add("drop-ok"); });
-    t.addEventListener("dragleave", e => { const b = e.target.closest(".nd"); if (b && !b.contains(e.relatedTarget)) b.classList.remove("drop-ok"); });
-    t.addEventListener("drop", e => { const b = e.target.closest(".nd"); if (!b || !ok(b.dataset.id)) return; e.preventDefault(); const id = st.drag; st.drag = null; clear(); moveNode(id, b.dataset.id); });
+    // ---- drag and drop ----
+    // st.drag = {kind:"move", id} | {kind:"new", color} | {kind:"here"}. While dragging over a box, a dashed
+    // "Goes here" box with dashed lines shows under it (level + parent named), so you see where it will land.
+    const pal = $("palette");
+    const addNode = (parent, color) => { const m = {id: uid(), parent, name: "", kw: "", color, num: ""}; st.plan.nodes.push(m); st.sel = m.id; touched(); drawMap();
+      nb.querySelector("input")?.focus(); };
+    pal.addEventListener("click", e => { const c = e.target.closest(".pal"); if (!c) return;
+      if (c.dataset.here) { const n = st.plan.nodes.find(x => x.id === st.sel); if (!n) { alert("Select a box first, or drag 'We are here' onto a box."); return; }
+        const on = !n.here; st.plan.nodes.forEach(x => x.here = false); n.here = on; touched(); drawMap(); return; }
+      addNode(st.sel && st.plan.nodes.some(x => x.id === st.sel) ? st.sel : null, c.dataset.new); });
+    pal.addEventListener("dragstart", e => { const c = e.target.closest(".pal"); if (!c) return;
+      st.drag = c.dataset.here ? {kind: "here"} : {kind: "new", color: c.dataset.new}; e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setData("text/plain", "new"); });
+    let ghost = null;
+    const unGhost = () => { if (!ghost) return; const {li, ul, made} = ghost; li.remove(); if (made && !ul.children.length) ul.remove(); ghost = null; };
+    const clear = () => { unGhost(); document.querySelectorAll(".drop-ok,.dragging").forEach(el => el.classList.remove("drop-ok", "dragging")); };
+    const ok = target => { const g = st.drag; if (!g) return false; if (g.kind !== "move") return true; return target !== g.id && !under(target, g.id); };
+    const showGhost = b => {
+      const id = b.dataset.id; if (ghost && ghost.for === id) return; unGhost();
+      document.querySelectorAll(".drop-ok").forEach(el => el.classList.remove("drop-ok")); b.classList.add("drop-ok");
+      if (st.drag.kind === "here") return;
+      const host = b.parentElement; let ul = host.querySelector(":scope>ul"), made = false;
+      if (!ul) { ul = document.createElement("ul"); ul.className = "ghost-ul"; host.append(ul); made = true; }
+      const n = st.plan.nodes.find(x => x.id === id), li = document.createElement("li"); li.className = "ghost";
+      const what = st.drag.kind === "move" ? (st.plan.nodes.find(x => x.id === st.drag.id) || {}).name || "This box" : "New box";
+      li.innerHTML = `<div class="nd-ghost"><b>${esc(what)} goes here</b><small>Level ${depth(id) + 1} · under ${esc(n.name || "Untitled")}</small></div>`;
+      ul.append(li); ghost = {for: id, li, ul, made};
+    };
+    const place = target => { const g = st.drag; st.drag = null; clear(); if (!g) return;
+      if (g.kind === "move") moveNode(g.id, target);
+      else if (g.kind === "new") addNode(target, g.color);
+      else if (g.kind === "here" && target) { st.plan.nodes.forEach(x => x.here = x.id === target); st.sel = target; touched(); drawMap(); } };
+    t.addEventListener("dragstart", e => { const b = e.target.closest(".nd"); if (!b || !st.editing) return; st.drag = {kind: "move", id: b.dataset.id};
+      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", b.dataset.id); requestAnimationFrame(() => b.parentElement.classList.add("dragging")); });
+    t.addEventListener("dragover", e => { if (!st.drag) return; const b = e.target.closest(".nd");
+      if (b && ok(b.dataset.id)) { e.preventDefault(); e.dataTransfer.dropEffect = st.drag.kind === "move" ? "move" : "copy"; showGhost(b); return; }
+      if (ghost || e.target.closest(".ghost")) { e.preventDefault(); } });  // keep the preview while the pointer is near it
+    t.addEventListener("dragleave", e => { if (!t.contains(e.relatedTarget)) clear(); });
+    t.addEventListener("drop", e => { if (!st.drag) return; const b = e.target.closest(".nd");
+      const target = b && ok(b.dataset.id) ? b.dataset.id : ghost ? ghost.for : null; e.preventDefault(); if (target) place(target); else { st.drag = null; clear(); } });
     document.addEventListener("dragend", () => { st.drag = null; clear(); });
-    nb.addEventListener("dragover", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag) return; e.preventDefault(); z.classList.add("drop-ok"); });
+    nb.addEventListener("dragover", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag || st.drag.kind === "here") return; e.preventDefault(); unGhost(); z.classList.add("drop-ok"); });
     nb.addEventListener("dragleave", e => { const z = e.target.closest("#rootDrop"); if (z) z.classList.remove("drop-ok"); });
-    nb.addEventListener("drop", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag) return; e.preventDefault(); const id = st.drag; st.drag = null; clear(); moveNode(id, null); });
+    nb.addEventListener("drop", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag || st.drag.kind === "here") return; e.preventDefault(); place(null); });
     nb.addEventListener("input", e => { const id = e.target.closest("[data-id]")?.dataset.id, f = e.target.dataset.f; if (!id || !f) return;
       const n = st.plan.nodes.find(x => x.id === id); n[f] = e.target.value; touched(); liveBox(n); });
     nb.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;

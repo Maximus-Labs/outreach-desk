@@ -166,3 +166,25 @@ table.t{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;font
 .rootdrop{flex:1 1 220px;border:1.5px dashed var(--line);border-radius:999px;padding:5px 14px;font-size:12px;color:var(--t3);text-align:center}
 .rootdrop.drop-ok{border-color:var(--accent);color:#fff;background:#0b1626}
 .tree-acts{align-items:center}
+
+/* add-box palette + level tags + dotted drop preview */
+.pal-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px;border:1px solid var(--line);border-radius:10px;background:#101010}
+.pal-l{font:500 11px "Geist Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-right:4px}
+.pal{all:unset;cursor:grab;display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12px;color:var(--t1);background:#161616;box-shadow:inset 0 0 0 1px var(--line);user-select:none}
+.pal:hover{background:#1d1d1d;box-shadow:inset 0 0 0 1px #3a3a3a}.pal:active{cursor:grabbing}
+.pal:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pal .dot:not(.green):not(.yellow):not(.red){background:transparent;box-shadow:inset 0 0 0 1.5px #5a5a5a}
+.pal-hint{font-size:11.5px;color:var(--t3);margin-left:auto}
+.nd .lv{font:500 9.5px "Geist Mono",monospace;color:var(--t3);letter-spacing:.04em;text-transform:uppercase}
+.ed .nd .lv{padding-left:10px}
+.org li.dragging>.nd,.org li.dragging>ul{opacity:.35}
+.org li.ghost::before,.org li.ghost::after{border-top:1.5px dashed var(--accent)!important}
+.org li.ghost::after{border-left:1.5px dashed var(--accent)!important}
+.org li.ghost:first-child::before,.org li.ghost:last-child::after{border-top-color:transparent!important}
+.org li.ghost:last-child::before{border-right:1.5px dashed var(--accent)!important}
+.org ul.ghost-ul::before{border-left:1.5px dashed var(--accent)}
+.org ul.ghost-ul>li.ghost:only-child{padding-top:0}
+.nd-ghost{display:grid;gap:2px;min-width:120px;max-width:170px;padding:9px 12px;border:1.5px dashed var(--accent);border-radius:10px;background:#0b1626;color:#cfe3ff;font-size:12px;text-align:center;animation:gh .9s ease-in-out infinite alternate}
+.nd-ghost small{color:#7fb3f5;font-size:11px}
+@keyframes gh{from{opacity:.65}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.nd-ghost{animation:none}}
