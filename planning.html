@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Planning · Outreach Desk</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Roboto:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
+<script src="shell.js"></script>
+<script src="dr.js"></script>
+<link rel="stylesheet" href="planning.css">
+</head><body>
+<div class="shell">
+  <nav class="sb" id="sb" aria-label="Views"></nav>
+  <main class="pl" id="main">
+    <header class="pl-head">
+      <div><p class="eyebrow">Planning · internal only</p><h1 id="title">Planning</h1></div>
+      <span class="muted mono" id="copied"></span>
+    </header>
+    <div class="banner" id="banner" hidden></div>
+
+    <section class="card" aria-labelledby="mmH">
+      <div class="card-h"><h2 id="mmH">Market map</h2>
+        <div class="legend" aria-label="Colour key"><span><i class="dot green"></i>Direct competitor · pitch first</span><span><i class="dot yellow"></i>Adjacent · pitch next</span><span><i class="dot red"></i>Don't pitch</span></div>
+        <div class="acts"><button class="btn ghost" id="mmEdit" aria-pressed="false">Edit</button><button class="btn" id="mmSave" hidden>Save</button></div>
+      </div>
+      <p class="muted small" id="mmMeta"></p>
+      <div class="mm">
+        <div class="mm-tree" id="tree"></div>
+        <div class="mm-side">
+          <div class="sub-card"><h3>Authoritative non-PR sources</h3><div id="nonpr"></div></div>
+          <div class="sub-card"><h3>PR</h3><div id="pr"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="rfH">
+      <div class="card-h"><h2 id="rfH">Refill by day</h2><span class="muted small" id="rfMeta"></span></div>
+      <div class="tbl-wrap" id="refill"></div>
+    </section>
+
+    <section class="card" aria-labelledby="drH">
+      <div class="card-h"><h2 id="drH">Domain Rating growth</h2><div class="acts"><button class="btn ghost" id="drTbl" aria-pressed="false">Table</button></div></div>
+      <div id="dr"></div>
+    </section>
+
+    <section class="card" aria-labelledby="srcH">
+      <div class="card-h"><h2 id="srcH">Sources</h2><span class="muted small">Counts from the Outreach Tracker Source column</span></div>
+      <div class="src-grid" id="sources"></div>
+    </section>
+  </main>
+</div>
+<script src="planning.js"></script>
+</body></html>
