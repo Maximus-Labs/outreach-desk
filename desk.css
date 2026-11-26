@@ -14,27 +14,13 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 a{color:var(--acc)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .app{display:grid;grid-template-columns:56px 340px minmax(0,1fr) 340px;height:100vh;overflow:hidden}
-.cb-btn{display:none!important}  /* the floating chat button: on this page Ask Claude sits in the rail */
 
-/* 1 · rail */
-.rail{position:relative;z-index:20}
-.rail-in{position:absolute;inset:0 auto 0 0;width:56px;background:var(--panel);border-right:1px solid var(--line2);transition:width .18s ease;display:flex;flex-direction:column;padding:12px 8px;gap:2px;overflow:hidden}
-.rail:hover .rail-in,.rail:focus-within .rail-in{width:224px;box-shadow:12px 0 32px rgba(0,0,0,.5)}
-.ri{position:relative;display:flex;align-items:center;gap:12px;height:38px;padding:0 9px;border-radius:8px;color:var(--text2);white-space:nowrap;text-decoration:none;flex:none}
-.ri:hover{background:var(--hover);color:var(--text)}
-.ri.on{background:var(--panel);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
-.ri .ic{flex:0 0 22px;height:22px;display:grid;place-items:center}
-.ri .ic svg,.ib svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.ri>span:not(.ic):not(.lg){opacity:0;transition:opacity .12s} .rail:hover .ri>span,.rail:focus-within .ri>span{opacity:1}
-.ri .ct{margin-left:auto;font:500 11px var(--mono);color:var(--text2);background:var(--raised);border-radius:999px;padding:0 7px}
-.ri .ct:empty{display:none}
-.ri .dot{position:absolute;left:28px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--panel)}
-.rail:hover .ri .dot{display:none}
+/* 1 · rail: shared, styled by shell.js */
+.ib svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .lg{flex:0 0 22px;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;background:#1A1A1A;box-shadow:inset 0 0 0 1px var(--line);overflow:hidden;color:var(--text2);font:600 11px var(--font)}
 .lg img{width:16px;height:16px;border-radius:3px}
 .lg.all{font-size:9.5px}
 .sep{height:1px;background:var(--line2);margin:8px 4px;flex:none}
-.rail-foot{margin-top:auto;display:grid;gap:2px}
 
 /* 2 · list */
 .list{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line2)}
@@ -210,7 +196,28 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 }
 @media (max-width:900px){
   .app{grid-template-columns:56px minmax(0,1fr)}
+}
+@media (max-width:860px){ .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)} }
+@media (max-width:900px){
   .work{display:none} .app.reading .list{display:none} .app.reading .work{display:flex}
   .wh .back{display:inline-flex}
   .wh{flex-wrap:wrap;padding:10px 14px;gap:8px} .wh .t{flex:1 1 160px} .wh .acts{margin-left:0;width:100%} .wh .k{display:none}
 }
+
+/* Skip menu + marked list */
+.pop{position:fixed;z-index:80;width:290px;background:#141414;border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.55)}
+.pop[hidden]{display:none}
+.pop-h{font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text3);padding:8px 8px 4px}
+.pop button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:8px;border-radius:8px;color:var(--text);font-size:13px}
+.pop button:hover{background:var(--hover)} .pop button small{color:var(--text3);font-size:11px}
+.pop-row{display:flex;gap:4px;padding:2px 4px 6px;align-items:center}
+.pop-row button{width:auto;flex:none;border:1px solid var(--line);padding:5px 8px;font-size:12px}
+.pop-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:4px;font:12px var(--font);color-scheme:dark}
+.qi.mk{cursor:default;opacity:.85}
+.qi.mk .undo{margin-top:4px;font-size:11.5px;color:var(--acc);border:1px solid var(--line);border-radius:6px;padding:1px 8px}
+.qi.mk .undo:hover{background:var(--hover)}
+
+/* mail-check warning on the header */
+.mcw{display:inline-flex;align-items:center;gap:6px;margin-top:4px;padding:2px 8px;border-radius:6px;background:rgba(229,167,59,.12);color:var(--amber);font:500 11.5px var(--font);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcw::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--amber);flex:none}
+.mcw[hidden]{display:none}

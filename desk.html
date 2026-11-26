@@ -3,18 +3,18 @@
 <title>Outreach Desk · Reply</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
-<script src="shell.js"></script>
+<script src="shell.js?v=4.0"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600&family=Geist+Mono:wght@400;500&family=Roboto:wght@400;500&display=swap">
-<link rel="stylesheet" href="desk.css?v=3.7">
+<link rel="stylesheet" href="desk.css?v=4.0">
 </head><body>
 <div class="app" id="app">
-  <!-- 1 · icon rail (opens on hover) -->
-  <nav class="rail" aria-label="Views"><div class="rail-in" id="rail"></div></nav>
+  <!-- 1 · icon rail: shared with every page, drawn by shell.js -->
+  <nav class="sr" id="sb" aria-label="Views"></nav>
 
   <!-- 2 · received emails -->
   <section class="list" aria-label="Received emails">
     <div class="lh">
-      <div class="lh-t"><h1 id="qTitle">Received emails</h1><div class="sub"><span class="sync" id="sync"><i></i><span id="syncTxt">Loading…</span></span> · <span id="qSub"></span></div></div>
+      <div class="lh-t"><h1 id="qTitle">Received emails</h1><div class="sub"><span class="sync" id="sync"><i></i><span id="syncTxt">Loading…</span></span> · <span id="qSub"></span></div><div class="mcw" id="mcWarn" role="status" hidden></div></div>
       <span class="tools">
         <button class="ib" id="searchBtn" title="Search  /" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
         <button class="ib" id="pullOne" title="Pull from Gmail" aria-label="Pull from Gmail"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg></button>
@@ -44,5 +44,5 @@
   <div class="row end"><button class="btn" value="cancel">Cancel</button><button class="btn pri" value="send">Send now</button></div>
 </form></dialog>
 <dialog id="know" class="wide"><div class="dlg" id="knowBody"></div></dialog>
-<script src="desk.js?v=3.7"></script>
+<script src="desk.js?v=4.0"></script>
 </body></html>

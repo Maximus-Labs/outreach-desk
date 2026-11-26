@@ -68,14 +68,6 @@ const whenLong = ts => { if (!ts) return ""; const d = toDate(ts); if (isNaN(d))
 const LOGO = {oliv: "oliv.ai", easywebinar: "easywebinar.com", versatile: "versatile.club", luca: "ask-luca.com", maximuslabs: "maximuslabs.ai", teamvoy: "teamvoy.com"};
 const logo = (key, name) => LOGO[key] ? `<span class="lg"><img src="https://www.google.com/s2/favicons?domain=${LOGO[key]}&sz=64" alt="" onerror="this.replaceWith(document.createTextNode('${esc((name || key)[0])}'))"></span>`
   : `<span class="lg">${esc((name || key || "?")[0])}</span>`;
-const ICON = {
-  mon: '<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>',
-  mail: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
-  list: '<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
-  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>',
-  spark: '<svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>',
-  out: '<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
-};
 // the status line on each row (colour follows the status automatically)
 function rowStatus(r) {
   if (r.job === "sending") return ["Sending", "var(--acc)", true];
@@ -116,12 +108,25 @@ async function tick() {
     const [ov, chat, cl, mc] = await Promise.all([api("/api/overview"), snap("chat"), S.clients.length ? null : snap("clients"), snap("mail_counts")]);
     S.overview = ov; S.chat = chat || []; if (cl) S.clients = cl;
     S.mc = mc && mc.at && Date.now() - new Date(mc.at) < 3 * 3600e3 ? mc : null;  // cloud mail counts, used while fresh (< 3 h)
+    mailWarn(mc);
     await loadQueue();
     renderRail();
     if (S.sel) { const jb = S.jobs[S.sel.tid]; const sig = jb ? jb.id + jb.status : "none";
       if (sig !== S.threadSig || (S.thread && S.thread.loading)) openThread(S.sel.key, S.sel.tid, true); else renderChat(); }
     S.lastOk = new Date(); setSync(true);
   } catch (e) { console.error("refresh failed", e); setSync(false, e); }
+}
+// amber note on the header when the cloud mail check failed or hasn't run for 2 h
+function mailWarn(mc) {
+  const w = $("#mcWarn"); if (!w) return;
+  const at = mc && mc.at ? new Date(mc.at) : null, hm = at ? at.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}) : "";
+  const errs = (mc && mc.errors) || [], old = !at || Date.now() - at > 2 * 3600e3;
+  let t = "";
+  if (mc && mc.ok === false) {
+    const who = [...new Set(errs.map(e => { const m = /^([^\s:]+@[^\s:]+):/.exec(String(e)); return m ? m[1] : ""; }).filter(Boolean))];
+    t = `Mail check: ${who.length ? who.join(", ") + " failed" : "failed"} at ${hm}`;
+  } else if (old) t = at ? `Mail check: last run ${at.toDateString() === new Date().toDateString() ? hm : whenLong(mc.at)} · over 2 h ago` : "Mail check: no run found";
+  w.hidden = !t; w.textContent = t; w.title = errs.length ? errs.join(" · ") : t;
 }
 function setSync(ok, e) {
   const s = $("#sync"), b = $("#banner"), t = S.lastOk ? S.lastOk.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", hour12: false}) : "";
@@ -132,29 +137,13 @@ function setSync(ok, e) {
   if (!ok) b.textContent = `Couldn't refresh${e && e.message ? ` (${e.message.slice(0, 80)})` : ""}. ${t ? `Showing data from ${t}.` : ""} Retrying…`;
 }
 
-// ---------------- rail ----------------
+// ---------------- rail (drawn by shell.js, shared with every page) ----------------
+// The desk hands the shared rail its newer mail_counts, the Skip clicks the mail check hasn't seen yet, and which clients have late replies.
 function renderRail() {
-  const ov = (S.overview && S.overview.clients) || [], q = S.queue || {reply: []};
-  const allQ = S.allReply || q.reply || [];
-  // count = partner emails waiting on us + follow-ups due: from the cloud mail check when fresh, else the desk's own view
-  const cnt = k => S.mc ? ((S.mc.clients || {})[k] || {}).total || 0 : ((ov.find(c => c.key === k) || {}).reply || 0);
-  const total = ov.reduce((a, c) => a + cnt(c.key), 0);
-  const late = k => allQ.some(r => r.client === k && r.bucket === "our" && r.age_days >= 3);
-  const item = (cls, href, ic, label, ct, extra = "") => `<a class="ri ${cls}" href="${href}" ${extra}>${ic}<span>${label}</span><span class="ct">${ct || ""}</span></a>`;
-  $("#rail").innerHTML =
-    item("", "monitor.html", `<span class="ic">${ICON.mon}</span>`, "Monitoring") +
-    item("on", "desk.html", `<span class="ic">${ICON.mail}</span>`, "Reply", total) +
-    item("", "tracker.html", `<span class="ic">${ICON.list}</span>`, "Outreach tracker") +
-    item("", "settings.html", `<span class="ic">${ICON.gear}</span>`, "Settings") +
-    `<div class="sep"></div>` +
-    item(S.client ? "" : "on", "desk.html", `<span class="lg all">All</span>`, "All clients", total, 'data-k=""') +
-    ov.map(c => `<a class="ri ${S.client === c.key ? "on" : ""}" href="desk.html?c=${esc(c.key)}" data-k="${esc(c.key)}" title="${esc(c.name)}">${logo(c.key, c.name)}${late(c.key) ? '<i class="dot" aria-label="late replies"></i>' : ""}<span>${esc(c.name)}</span><span class="ct">${cnt(c.key) || ""}</span></a>`).join("") +
-    `<div class="rail-foot">` +
-    `<a class="ri" href="#" id="askBtn"><span class="ic">${ICON.spark}</span><span>Ask Claude</span></a>` +
-    `<a class="ri" href="#" id="outBtn"><span class="ic">${ICON.out}</span><span>Sign out</span></a></div>`;
-  document.querySelectorAll("#rail a[data-k]").forEach(a => a.onclick = e => { e.preventDefault(); pickClient(a.dataset.k); });
-  $("#askBtn").onclick = e => { e.preventDefault(); const b = document.querySelector(".cb-btn"); if (b) b.click(); };
-  $("#outBtn").onclick = e => { e.preventDefault(); window.signOut && window.signOut(); };
+  const allQ = S.allReply || (S.queue || {}).reply || [], minus = {}, late = new Set();
+  if (S.mc) (S.mc.rows || []).forEach(r => { if (isMarked(r.thread_id)) minus[r.client] = (minus[r.client] || 0) + 1; });
+  allQ.forEach(r => { if (r.bucket === "our" && r.age_days >= 3) late.add(r.client); });
+  if (window.Shell && Shell.local) Shell.local({mc: S.mc, minus, late});
 }
 function pickClient(k) {
   S.client = k || ""; history.replaceState(null, "", S.client ? "?c=" + S.client : location.pathname);
@@ -170,7 +159,7 @@ async function loadQueue() {
   if (S.mc) {  // the counted rows come from the cloud mail check; desk rows add drafts / status where they exist
     const byId = {}; for (const k of ["reply", "client", "done", "paid", "other"]) (q[k] || []).forEach(r => byId[r.thread_id] = r);
     const ids = new Set(), names = Object.fromEntries((S.overview.clients || []).map(c => [c.key, c.name]));
-    const mrows = (S.mc.rows || []).filter(r => !want || r.client === want).map(r => { ids.add(r.thread_id);
+    const mrows = (S.mc.rows || []).filter(r => (!want || r.client === want) && !isMarked(r.thread_id)).map(r => { ids.add(r.thread_id);
       const d = byId[r.thread_id] || {}, t = r.kind === "reply" ? r.last_them_at : r.last_us_at;
       return Object.assign({}, d, {client: r.client, client_name: names[r.client] || r.client_name, thread_id: r.thread_id,
         who: d.who || r.who || r.domain, domain: r.domain, subject: d.subject || r.subject, ts: Date.parse(t) / 1000,
@@ -207,10 +196,11 @@ async function loadQueue() {
     html = sec("Needs reply", G.now) +
       sec("Other partner emails · not counted", G.unrep, "Partner emails outside our link-exchange proposals (different subject line). Shown for a glance; not counted.") +
       sec("They wrote last · report says no reply", G.check, "The partner wrote last; the monitoring report judged no reply is needed. Skip it if that's right.") +
-      sec("Follow-up due", G.fu);
+      sec("Follow-up due", G.fu) + markedSection(S.client);
   } else html = list.map(row).join("");
   $("#qList").innerHTML = html;
-  document.querySelectorAll("#qList .qi").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
+  document.querySelectorAll("#qList .qi:not(.mk)").forEach(b => b.onclick = () => openThread(b.dataset.k, b.dataset.t));
+  document.querySelectorAll("#qList .undo").forEach(b => b.onclick = e => { e.stopPropagation(); undoMark(b.dataset.k, b.dataset.t); });
   renderToday();
 }
 function renderToday() {
@@ -293,13 +283,65 @@ function renderWork() {
 function wireHead() {
   $("#back").onclick = () => $("#app").classList.remove("reading");
   $("#nextBtn").onclick = () => step(1);
-  $("#skipTop").onclick = () => skipThis();
+  $("#skipTop").onclick = e => { e.stopPropagation(); skipThis(e.currentTarget); };
   $("#ctxBtn").onclick = () => $("#app").classList.toggle("ctx-open");
 }
-function skipThis() {
+// ---------------- Skip with a reason (paid / declined / no reply / later) ----------------
+S.marks = {};   // thread_id -> {reason, until, at, client}: clicks the cloud mail check has not seen yet
+S.undone = {};  // thread_id -> at: undo clicks not yet seen
+const REASONS = {paid: "Paid placement", declined: "Declined / not a fit", no_reply: "No reply needed", later: "Later"};
+const isMarked = tid => { const m = S.marks[tid]; return !!(m && (!S.mc || Date.parse(S.mc.at) < m.at)); };
+const ymd = d => d.toISOString().slice(0, 10);
+function skipThis(anchor) {
   if (!S.sel) return;
-  if (!confirm("Skip this email? It is logged as 'no reply needed'.")) return;
-  act("skip", {reason: ($("#instr") || {}).value || ""}, "Skipped and logged");
+  let pop = $("#skipPop");
+  if (!pop) { pop = document.createElement("div"); pop.id = "skipPop"; pop.className = "pop"; document.body.append(pop); }
+  const t1 = new Date(Date.now() + 864e5), t3 = new Date(Date.now() + 3 * 864e5);
+  pop.innerHTML = `<div class="pop-h">Skip this email · it leaves the count</div>
+    <button data-r="paid">Paid placement <small>closed for good</small></button>
+    <button data-r="declined">Declined / not a fit <small>closed for good</small></button>
+    <button data-r="no_reply">No reply needed <small>back if they write again</small></button>
+    <div class="pop-h">Later · comes back on the date</div>
+    <div class="pop-row"><button data-r="later" data-u="${ymd(t1)}">Tomorrow</button><button data-r="later" data-u="${ymd(t3)}">In 3 days</button>
+      <input type="date" id="laterDate" min="${ymd(t1)}" aria-label="Pick a date"><button id="laterGo">Set</button></div>`;
+  const r = (anchor || $("#skipTop")).getBoundingClientRect();
+  pop.style.top = (r.bottom + 6) + "px";
+  pop.style.left = Math.max(8, Math.min(innerWidth - 300, r.right - 280)) + "px";
+  pop.hidden = false;
+  const pick = (reason, until) => { pop.hidden = true; markThread(reason, until); };
+  pop.querySelectorAll("button[data-r]").forEach(b => b.onclick = () => pick(b.dataset.r, b.dataset.u || ""));
+  $("#laterGo").onclick = () => { const v = $("#laterDate").value; if (v) pick("later", v); };
+  setTimeout(() => document.addEventListener("click", function off(e) {
+    if (!pop.contains(e.target)) { pop.hidden = true; document.removeEventListener("click", off); } }), 0);
+}
+async function markThread(reason, until) {
+  const {key, tid} = S.sel;
+  try {
+    await api(`/api/clients/${key}/threads/${encodeURIComponent(tid)}/skip`, {reason, until, label: REASONS[reason]});
+    S.marks[tid] = {reason, until, at: Date.now(), client: key};
+    toast(`${REASONS[reason]}${until ? " · back " + until : ""} · removed from the count`);
+    await loadQueue(); renderRail(); step(1);
+  } catch (e) { toast(e.message, true); }
+}
+async function undoMark(key, tid) {
+  try {
+    await addReq("skip", key, tid, {reason: "undo"});
+    delete S.marks[tid]; S.undone[tid] = Date.now();
+    toast("Undone · back in the count at the next mail check (within 30 min)");
+    await loadQueue(); renderRail();
+  } catch (e) { toast(e.message, true); }
+}
+function markedSection(want) {
+  const fresh = S.mc ? Date.parse(S.mc.at) : 0, parked = (S.mc && S.mc.parked) || [];
+  const local = Object.entries(S.marks).filter(([tid]) => isMarked(tid) && !parked.some(p => p.thread_id === tid))
+    .map(([tid, m]) => { const r = ((S.mc && S.mc.rows) || []).find(x => x.thread_id === tid) || {};
+      return {thread_id: tid, client: m.client, who: r.who || r.domain || "This email", domain: r.domain || "", kind: m.reason, until: m.until}; });
+  const rows = [...parked.filter(p => !(S.undone[p.thread_id] > fresh)), ...local].filter(p => !want || p.client === want);
+  if (!rows.length) return "";
+  const lab = p => p.kind === "later" ? `Later · back ${esc(String(p.until || "").slice(0, 10))}` : esc(REASONS[p.kind] || "Skipped");
+  return `<div class="grp" title="Emails you marked. Not counted. Paid and declined stay closed; Later comes back on its date."><span>Marked by you · not counted</span><span>${rows.length}</span></div>` +
+    rows.map(p => `<div class="qi mk"><span class="av">${esc(initials(p.who))}</span><span class="who"><b>${esc(p.who)}</b><span>${esc(p.domain)}</span></span>
+      <span class="meta"><span class="st">${lab(p)}${p.new_since ? " · new email" : ""}</span><button class="undo" data-k="${esc(p.client)}" data-t="${esc(p.thread_id)}">Undo</button></span></div>`).join("");
 }
 
 function renderComposer() {
@@ -333,7 +375,7 @@ function renderComposer() {
     box.querySelectorAll(".gm-s button").forEach(b => b.onclick = () => { $("#instr").value = b.textContent; $("#instr").focus(); });
     const ta = $("#body"); ta.style.height = Math.max(220, ta.scrollHeight + 6) + "px";
   }
-  const sk = $("#skip"); if (sk) sk.onclick = () => skipThis();
+  const sk = $("#skip"); if (sk) sk.onclick = e => { e.stopPropagation(); skipThis(e.currentTarget); };
   const go = $("#go"), inp = $("#instr");
   const start = async () => {
     go.disabled = true;
@@ -492,7 +534,7 @@ document.addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === "j") { e.preventDefault(); step(1); }
   else if (e.key === "k") { e.preventDefault(); step(-1); }
-  else if (e.key === "s" && S.sel) { e.preventDefault(); skipThis(); }
+  else if (e.key === "s" && S.sel) { e.preventDefault(); skipThis($("#skipTop")); }
   else if (e.key === "/") { e.preventDefault(); $("#searchBox").hidden = false; $("#qSearch").focus(); }
 });
 S.client = new URLSearchParams(location.search).get("c") || "";
