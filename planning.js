@@ -54,9 +54,10 @@
       + (st.hasDraft ? " · unsaved draft on this browser" : "") + " · Top = widest market, each branch down = narrower. Number = pitch order."
       + (ed ? " Click a box to edit it." : "");
     const kids = id => p.nodes.filter(n => (n.parent || null) === id);
-    const box = n => `<button type="button" class="nd ${esc(n.color)}${n.here ? " here" : ""}${ed && st.sel === n.id ? " sel" : ""}" data-id="${n.id}" ${ed ? "" : 'tabindex="-1"'}
-        title="${esc([n.name, n.kw, colorName(n.color)].filter(Boolean).join(" · "))}">${n.num ? `<span class="no">${esc(n.num)}</span>` : ""}
-        <span class="nm">${esc(n.name || "Untitled")}</span>${n.kw ? `<span class="kw">${esc(n.kw)}</span>` : ""}${n.here ? '<i class="pin" aria-label="We are here"></i>' : ""}</button>`;
+    const box = n => `<div class="nd ${esc(n.color)}${n.here ? " here" : ""}${ed && st.sel === n.id ? " sel" : ""}" data-id="${n.id}" ${ed ? 'role="button" tabindex="0" draggable="true"' : ""}
+        title="${esc(ed ? "Drag onto another box to connect it under that box" : [n.name, n.kw, colorName(n.color)].filter(Boolean).join(" · "))}">${n.num ? `<span class="no">${esc(n.num)}</span>` : ""}
+        <span class="nm">${esc(n.name || "Untitled")}</span>${n.kw ? `<span class="kw">${esc(n.kw)}</span>` : ""}${n.here ? '<i class="pin" aria-label="We are here"></i>' : ""}
+        ${ed ? `<span class="nd-x" data-x="${n.id}" role="button" tabindex="0" title="Remove this box" aria-label="Remove ${esc(n.name || "box")}">×</span>` : ""}</div>`;
     const li = n => { const ch = kids(n.id); return `<li>${box(n)}${ch.length ? `<ul>${ch.map(li).join("")}</ul>` : ""}</li>`; };
     const roots = kids(null);
     $("tree").className = ed ? "ed" : "";
@@ -81,7 +82,9 @@
           <button type="button" class="sw" data-act="here" aria-pressed="${!!n.here}"><i class="ring"></i>We are here</button></div>
         <div class="row"><button type="button" class="btn sm" data-act="child">+ Narrower market under this</button><button type="button" class="btn sm ghost" data-act="sib">+ Same level</button>
           <button type="button" class="btn sm danger" data-act="del" style="margin-left:auto">Remove</button></div></div>` : "")
-      + `<div class="tree-acts"><button type="button" class="btn sm ghost" data-act="root">+ Add top (widest) market</button></div>`;
+      + `<div class="tree-acts"><button type="button" class="btn sm ghost" data-act="root">+ Add top (widest) market</button>
+          <div class="rootdrop" id="rootDrop">Drop a box here to make it a top market</div></div>
+        <p class="muted small" style="margin:0">Drag a box onto another box to connect it underneath. × removes a box; boxes under it move up one level.</p>`;
   }
   function drawList(f, ph) {
     const list = st.plan[f] || [], ed = st.editing;
@@ -99,22 +102,48 @@
     let kw = el.querySelector(".kw"); if (n.kw) { if (!kw) { kw = document.createElement("span"); kw.className = "kw"; el.querySelector(".nm").after(kw); } kw.textContent = n.kw; } else if (kw) kw.remove();
     let no = el.querySelector(".no"); if (n.num) { if (!no) { no = document.createElement("span"); no.className = "no"; el.prepend(no); } no.textContent = n.num; } else if (no) no.remove();
   }
+  const under = (id, anc) => { let p = (st.plan.nodes.find(x => x.id === id) || {}).parent; while (p) { if (p === anc) return true; p = (st.plan.nodes.find(x => x.id === p) || {}).parent; } return false; };
+  function removeNode(id) {  // remove one box; the boxes under it move up to its parent, so no branch is lost
+    const nodes = st.plan.nodes, n = nodes.find(x => x.id === id); if (!n) return;
+    const ch = nodes.filter(x => x.parent === id);
+    if ((n.name || ch.length) && !confirm(`Remove "${n.name || "this box"}"?${ch.length ? ` The ${ch.length} box${ch.length > 1 ? "es" : ""} under it move up one level.` : ""}`)) return;
+    ch.forEach(x => x.parent = n.parent || null); st.plan.nodes = nodes.filter(x => x.id !== id);
+    if (st.sel === id) st.sel = null; touched(); drawMap();
+  }
+  function moveNode(id, parent) {  // connect box `id` under `parent` (null = top market)
+    const n = st.plan.nodes.find(x => x.id === id); if (!n || id === parent || (parent && under(parent, id)) || (n.parent || null) === parent) return;
+    n.parent = parent; st.sel = id; touched(); drawMap();
+  }
   function bindMap() {
-    $("tree").addEventListener("click", e => { const b = e.target.closest(".nd"); if (!b || !st.editing) return; st.sel = b.dataset.id; drawMap();
-      $("nodeEd").querySelector("input")?.focus(); });
-    $("nodeEd").addEventListener("input", e => { const id = e.target.closest("[data-id]")?.dataset.id, f = e.target.dataset.f; if (!id || !f) return;
+    const t = $("tree"), nb = $("nodeEd");
+    t.addEventListener("click", e => { if (!st.editing) return; const x = e.target.closest(".nd-x"); if (x) { e.stopPropagation(); removeNode(x.dataset.x); return; }
+      const b = e.target.closest(".nd"); if (!b) return; st.sel = b.dataset.id; drawMap(); nb.querySelector("input")?.focus(); });
+    t.addEventListener("keydown", e => { if (!st.editing || (e.key !== "Enter" && e.key !== " " && e.key !== "Delete")) return;
+      const x = e.target.closest(".nd-x"), b = e.target.closest(".nd"); if (!b) return; e.preventDefault();
+      if (x || e.key === "Delete") removeNode(b.dataset.id); else { st.sel = b.dataset.id; drawMap(); nb.querySelector("input")?.focus(); } });
+    // drag and drop: drop a box on another box = connect under it; on the strip below = top market
+    const clear = () => document.querySelectorAll(".drop-ok,.dragging").forEach(el => el.classList.remove("drop-ok", "dragging"));
+    const ok = target => st.drag && target !== st.drag && !under(target, st.drag);
+    t.addEventListener("dragstart", e => { const b = e.target.closest(".nd"); if (!b || !st.editing) return; st.drag = b.dataset.id;
+      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", st.drag); b.classList.add("dragging"); });
+    t.addEventListener("dragover", e => { const b = e.target.closest(".nd"); if (!b || !ok(b.dataset.id)) return; e.preventDefault(); e.dataTransfer.dropEffect = "move";
+      document.querySelectorAll(".drop-ok").forEach(el => el !== b && el.classList.remove("drop-ok")); b.classList.add("drop-ok"); });
+    t.addEventListener("dragleave", e => { const b = e.target.closest(".nd"); if (b && !b.contains(e.relatedTarget)) b.classList.remove("drop-ok"); });
+    t.addEventListener("drop", e => { const b = e.target.closest(".nd"); if (!b || !ok(b.dataset.id)) return; e.preventDefault(); const id = st.drag; st.drag = null; clear(); moveNode(id, b.dataset.id); });
+    document.addEventListener("dragend", () => { st.drag = null; clear(); });
+    nb.addEventListener("dragover", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag) return; e.preventDefault(); z.classList.add("drop-ok"); });
+    nb.addEventListener("dragleave", e => { const z = e.target.closest("#rootDrop"); if (z) z.classList.remove("drop-ok"); });
+    nb.addEventListener("drop", e => { const z = e.target.closest("#rootDrop"); if (!z || !st.drag) return; e.preventDefault(); const id = st.drag; st.drag = null; clear(); moveNode(id, null); });
+    nb.addEventListener("input", e => { const id = e.target.closest("[data-id]")?.dataset.id, f = e.target.dataset.f; if (!id || !f) return;
       const n = st.plan.nodes.find(x => x.id === id); n[f] = e.target.value; touched(); liveBox(n); });
-    $("nodeEd").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+    nb.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
       const nodes = st.plan.nodes, n = nodes.find(x => x.id === st.sel), act = b.dataset.act;
       if (b.dataset.color !== undefined && n) { n.color = b.dataset.color; touched(); drawMap(); return; }
       if (act === "here" && n) { const on = !n.here; nodes.forEach(x => x.here = false); n.here = on; touched(); drawMap(); return; }
       if (act === "root" || (n && (act === "child" || act === "sib"))) {
         const m = {id: uid(), parent: act === "child" ? n.id : act === "sib" ? (n.parent || null) : null, name: "", kw: "", color: "", num: ""};
         nodes.push(m); st.sel = m.id; touched(); drawMap(); $("nodeEd").querySelector("input")?.focus(); return; }
-      if (act === "del" && n) { const gone = new Set([n.id]); let grew = true;
-        while (grew) { grew = false; nodes.forEach(x => { if (x.parent && gone.has(x.parent) && !gone.has(x.id)) { gone.add(x.id); grew = true; } }); }
-        if ((gone.size > 1 || n.name) && !confirm(`Remove "${n.name || "this market"}"${gone.size > 1 ? ` and ${gone.size - 1} under it` : ""}?`)) return;
-        st.plan.nodes = nodes.filter(x => !gone.has(x.id)); st.sel = null; touched(); drawMap(); } });
+      if (act === "del" && n) removeNode(n.id); });
     for (const f of ["nonpr", "pr"]) {
       $(f).addEventListener("input", e => { const i = e.target.closest("[data-i]")?.dataset.i; if (i == null) return; st.plan[f][i][e.target.dataset.f] = e.target.value; touched(); });
       $(f).addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b) return;
