@@ -7,7 +7,7 @@
 <script src="auth.js"></script>
 <script src="shell.js?v=4.1"></script>
 <script src="dr.js"></script>
-<link rel="stylesheet" href="planning.css">
+<link rel="stylesheet" href="planning.css?v=2">
 </head><body>
 <div class="shell">
   <nav class="sb" id="sb" aria-label="Views"></nav>
@@ -18,24 +18,19 @@
     </header>
     <div class="banner" id="banner" hidden></div>
 
-    <section class="card" aria-labelledby="mmH">
+    <section class="card board-card" aria-labelledby="mmH">
       <div class="card-h"><h2 id="mmH">Market map</h2>
-        <div class="legend" aria-label="Colour key"><span><i class="dot green"></i>Direct competitor · pitch first</span><span><i class="dot yellow"></i>Adjacent · pitch next</span><span><i class="dot red"></i>Don't pitch</span></div>
+        <div class="legend" aria-label="Colour key"><span><i class="dot green"></i>Direct competitor · pitch first</span><span><i class="dot yellow"></i>Adjacent · pitch next</span><span><i class="dot red"></i>Don't pitch</span><span><i class="ring"></i>We are here</span></div>
         <div class="acts"><button class="btn ghost" id="mmEdit" aria-pressed="false">Edit</button><button class="btn" id="mmSave" hidden>Save</button></div>
       </div>
       <p class="muted small" id="mmMeta"></p>
-      <div class="mm">
-        <div class="mm-tree" id="tree"></div>
-        <div class="mm-side">
-          <div class="sub-card"><h3>Authoritative non-PR sources</h3><div id="nonpr"></div></div>
-          <div class="sub-card"><h3>PR</h3><div id="pr"></div></div>
-        </div>
+      <div class="board">
+        <div class="b-tree"><div id="tree"></div><div id="nodeEd"></div></div>
+        <div class="b-col"><h3>Authoritative non-PR sources</h3><div id="nonpr"></div></div>
+        <div class="b-col"><h3>PR</h3><div id="pr"></div></div>
+        <div class="b-src"><h3>Sources</h3><div id="sources"></div></div>
+        <div class="b-rf"><div class="rf-h"><h3>Refill by day</h3><span class="muted small" id="rfMeta"></span></div><div class="tbl-wrap" id="refill"></div></div>
       </div>
-    </section>
-
-    <section class="card" aria-labelledby="rfH">
-      <div class="card-h"><h2 id="rfH">Refill by day</h2><span class="muted small" id="rfMeta"></span></div>
-      <div class="tbl-wrap" id="refill"></div>
     </section>
 
     <section class="card" aria-labelledby="drH">
@@ -43,11 +38,7 @@
       <div id="dr"></div>
     </section>
 
-    <section class="card" aria-labelledby="srcH">
-      <div class="card-h"><h2 id="srcH">Sources</h2><span class="muted small">Counts from the Outreach Tracker Source column</span></div>
-      <div class="src-grid" id="sources"></div>
-    </section>
   </main>
 </div>
-<script src="planning.js"></script>
+<script src="planning.js?v=2"></script>
 </body></html>

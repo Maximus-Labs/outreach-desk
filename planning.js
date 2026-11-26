@@ -12,7 +12,7 @@
   const COLORS = [["green", "Direct competitor"], ["yellow", "Adjacent"], ["red", "Don't pitch"], ["", "Unmarked"]];
   let key = new URLSearchParams(location.search).get("c");
   if (!CLIENTS[key]) key = "luca";
-  const st = {editing: false, plan: null, planAt: null, planBy: "", store: "unknown", status: null, trackers: {}, sites: {}, dr: {}, drTable: false};
+  const st = {sel: null, editing: false, plan: null, planAt: null, planBy: "", store: "unknown", status: null, trackers: {}, sites: {}, dr: {}, drTable: false};
   const blank = () => ({nodes: [], nonpr: [], pr: []});
   const uid = () => Math.random().toString(36).slice(2, 9);
   const draftKey = () => "planning-draft:" + key;
@@ -43,65 +43,86 @@
     if (!st.plan) st.plan = blank();
   }
 
-  // ---------- 1. market map ----------
-  function depthOf(n, nodes) { let d = 1, p = n.parent; while (p) { d++; p = (nodes.find(x => x.id === p) || {}).parent; } return d; }
+  // ---------- 1. market map: widest market on top, narrower ones branch down ----------
+  const colorName = c => (COLORS.find(x => x[0] === (c || "")) || [])[1];
   function drawMap() {
     const p = st.plan, ed = st.editing;
     $("mmEdit").textContent = ed ? "Done" : "Edit"; $("mmEdit").setAttribute("aria-pressed", ed);
     $("mmSave").hidden = !ed; $("mmSave").disabled = st.store !== "ok";
     $("mmSave").title = st.store === "ok" ? "Save for the whole team" : "Saving is off until planning.sql has run in Supabase";
     $("mmMeta").textContent = (st.planAt ? `Saved ${fmtT(st.planAt)}${st.planBy ? " by " + st.planBy.split("@")[0] : ""}` : "Not saved yet")
-      + (st.hasDraft ? " · unsaved draft on this browser" : "") + " · Level 1 = narrowest market, 4 = widest.";
+      + (st.hasDraft ? " · unsaved draft on this browser" : "") + " · Top = widest market, each branch down = narrower. Number = pitch order."
+      + (ed ? " Click a box to edit it." : "");
     const kids = id => p.nodes.filter(n => (n.parent || null) === id);
-    const li = n => {
-      const d = depthOf(n, p.nodes), ch = kids(n.id);
-      const body = ed
-        ? `<div class="node ${esc(n.color)}" data-id="${n.id}"><span class="lv">L${d}</span>
-            <input class="nm-i" data-f="name" value="${esc(n.name)}" placeholder="Market or segment" aria-label="Name">
-            <input class="kw-i" data-f="kw" value="${esc(n.kw)}" placeholder="Keyword / market" aria-label="Keyword or market">
-            <select data-f="color" aria-label="Colour">${COLORS.map(([v, l]) => `<option value="${v}" ${v === (n.color || "") ? "selected" : ""}>${l}</option>`).join("")}</select>
-            ${d < 4 ? `<button class="ibtn" data-act="child" title="Add a wider market under this (level ${d + 1})" aria-label="Add child">+</button>` : ""}
-            <button class="ibtn" data-act="del" title="Remove this and everything under it" aria-label="Remove">×</button></div>`
-        : `<div class="node ${esc(n.color)}"><span class="lv">L${d}</span><i class="dot ${esc(n.color)}" aria-label="${esc((COLORS.find(c => c[0] === (n.color || "")) || [])[1])}"></i>
-            <span class="nm">${esc(n.name || "Untitled")}</span>${n.kw ? `<span class="kw">${esc(n.kw)}</span>` : ""}</div>`;
-      return `<li>${body}${ch.length ? `<ul>${ch.map(li).join("")}</ul>` : ""}</li>`;
-    };
+    const box = n => `<button type="button" class="nd ${esc(n.color)}${n.here ? " here" : ""}${ed && st.sel === n.id ? " sel" : ""}" data-id="${n.id}" ${ed ? "" : 'tabindex="-1"'}
+        title="${esc([n.name, n.kw, colorName(n.color)].filter(Boolean).join(" · "))}">${n.num ? `<span class="no">${esc(n.num)}</span>` : ""}
+        <span class="nm">${esc(n.name || "Untitled")}</span>${n.kw ? `<span class="kw">${esc(n.kw)}</span>` : ""}${n.here ? '<i class="pin" aria-label="We are here"></i>' : ""}</button>`;
+    const li = n => { const ch = kids(n.id); return `<li>${box(n)}${ch.length ? `<ul>${ch.map(li).join("")}</ul>` : ""}</li>`; };
     const roots = kids(null);
-    $("tree").innerHTML = `<div class="lvl-head"><span>L1 narrowest</span><span>L2</span><span>L3</span><span>L4 widest</span></div>`
-      + (roots.length ? `<ul class="tree">${roots.map(li).join("")}</ul>` : `<p class="empty">No market map yet.${ed ? "" : " Press Edit to start with the narrowest market (level 1)."}</p>`)
-      + (ed ? `<button class="add" data-act="root">+ Add level 1 market</button>` : "");
-    drawList("nonpr", "Add a source (e.g. G2, industry report)"); drawList("pr", "Add a PR outlet or network");
+    $("tree").className = ed ? "ed" : "";
+    $("tree").innerHTML = roots.length ? `<ul class="org">${roots.map(li).join("")}</ul>`
+      : `<div class="tree-empty"><b style="color:var(--t2)">No market map yet</b><span>${ed ? "Add the widest market first, then branch narrower markets under it." : "Press Edit and start with the widest market at the top."}</span></div>`;
+    fitTree(); drawNodeEd();
+    drawList("nonpr", "Add source"); drawList("pr", "Add PR outlet");
+  }
+  function fitTree() {  // shrink a wide tree to fit its box (down to 60%), scroll only beyond that
+    const t = $("tree"), org = t.querySelector(".org"); if (!org) return; org.style.zoom = 1;
+    const need = org.scrollWidth, have = t.clientWidth - 4; org.style.zoom = need > have ? Math.max(.6, have / need).toFixed(3) : 1;
+  }
+  window.addEventListener("resize", () => fitTree());
+  function drawNodeEd() {
+    const ed = st.editing, n = ed && st.plan.nodes.find(x => x.id === st.sel);
+    if (!ed) { $("nodeEd").innerHTML = ""; return; }
+    $("nodeEd").innerHTML = (n ? `<div class="edp" data-id="${n.id}">
+        <div class="row"><label>Market / segment<input data-f="name" value="${esc(n.name)}" placeholder="e.g. Ecommerce analytics"></label>
+          <label>Keyword<input data-f="kw" value="${esc(n.kw)}" placeholder="e.g. best ecommerce analytics tools"></label>
+          <label class="sm">No.<input data-f="num" value="${esc(n.num)}" inputmode="numeric" placeholder="1"></label></div>
+        <div class="row" role="group" aria-label="Colour">${COLORS.map(([v, l]) => `<button type="button" class="sw" data-color="${v}" aria-pressed="${(n.color || "") === v}"><i class="dot ${v}"></i>${l}</button>`).join("")}
+          <button type="button" class="sw" data-act="here" aria-pressed="${!!n.here}"><i class="ring"></i>We are here</button></div>
+        <div class="row"><button type="button" class="btn sm" data-act="child">+ Narrower market under this</button><button type="button" class="btn sm ghost" data-act="sib">+ Same level</button>
+          <button type="button" class="btn sm danger" data-act="del" style="margin-left:auto">Remove</button></div></div>` : "")
+      + `<div class="tree-acts"><button type="button" class="btn sm ghost" data-act="root">+ Add top (widest) market</button></div>`;
   }
   function drawList(f, ph) {
     const list = st.plan[f] || [], ed = st.editing;
     $(f).innerHTML = `<div class="items">${ed
-      ? list.map((x, i) => `<div class="row-e" data-i="${i}"><input data-f="name" value="${esc(x.name)}" placeholder="Name or URL" aria-label="Name"><input data-f="note" value="${esc(x.note)}" placeholder="Note" aria-label="Note"><button class="ibtn" data-act="del" aria-label="Remove">×</button></div>`).join("")
+      ? list.map((x, i) => `<div class="row-e" data-i="${i}"><input data-f="name" value="${esc(x.name)}" placeholder="Name or URL" aria-label="Name"><input data-f="note" value="${esc(x.note)}" placeholder="Note (optional)" aria-label="Note"><button class="ibtn" data-act="del" aria-label="Remove">×</button></div>`).join("")
         + `<button class="add" data-act="add">+ ${esc(ph)}</button>`
       : list.length ? list.map(x => { const n = String(x.name || ""), u = /^https?:\/\//.test(n) ? n : /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(n) ? "https://" + n : "";
           return `<div class="item"><span class="t">${u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>` : esc(n)}</span>${x.note ? `<span class="n">${esc(x.note)}</span>` : ""}</div>`; }).join("")
         : `<p class="empty">None yet.</p>`}</div>`;
   }
   function touched() { st.hasDraft = true; lsSet(draftKey(), {at: new Date().toISOString(), plan: st.plan}); }
+  function liveBox(n) {  // update one box while typing, so the cursor stays in the field
+    const el = document.querySelector(`#tree .nd[data-id="${n.id}"]`); if (!el) return;
+    el.querySelector(".nm").textContent = n.name || "Untitled";
+    let kw = el.querySelector(".kw"); if (n.kw) { if (!kw) { kw = document.createElement("span"); kw.className = "kw"; el.querySelector(".nm").after(kw); } kw.textContent = n.kw; } else if (kw) kw.remove();
+    let no = el.querySelector(".no"); if (n.num) { if (!no) { no = document.createElement("span"); no.className = "no"; el.prepend(no); } no.textContent = n.num; } else if (no) no.remove();
+  }
   function bindMap() {
-    $("tree").addEventListener("input", e => { const id = e.target.closest("[data-id]")?.dataset.id, f = e.target.dataset.f; if (!id || !f) return;
-      const n = st.plan.nodes.find(x => x.id === id); n[f] = e.target.value; touched();
-      if (f === "color") { e.target.closest(".node").className = "node " + n.color; } });
-    $("tree").addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b) return;
-      const id = b.closest("[data-id]")?.dataset.id, act = b.dataset.act, nodes = st.plan.nodes;
-      if (act === "root" || act === "child") { const n = {id: uid(), parent: act === "child" ? id : null, name: "", kw: "", color: ""}; nodes.push(n); touched(); drawMap();
-        document.querySelector(`[data-id="${n.id}"] input`)?.focus(); }
-      if (act === "del") { const n = nodes.find(x => x.id === id), gone = new Set([id]); let grew = true;
+    $("tree").addEventListener("click", e => { const b = e.target.closest(".nd"); if (!b || !st.editing) return; st.sel = b.dataset.id; drawMap();
+      $("nodeEd").querySelector("input")?.focus(); });
+    $("nodeEd").addEventListener("input", e => { const id = e.target.closest("[data-id]")?.dataset.id, f = e.target.dataset.f; if (!id || !f) return;
+      const n = st.plan.nodes.find(x => x.id === id); n[f] = e.target.value; touched(); liveBox(n); });
+    $("nodeEd").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      const nodes = st.plan.nodes, n = nodes.find(x => x.id === st.sel), act = b.dataset.act;
+      if (b.dataset.color !== undefined && n) { n.color = b.dataset.color; touched(); drawMap(); return; }
+      if (act === "here" && n) { const on = !n.here; nodes.forEach(x => x.here = false); n.here = on; touched(); drawMap(); return; }
+      if (act === "root" || (n && (act === "child" || act === "sib"))) {
+        const m = {id: uid(), parent: act === "child" ? n.id : act === "sib" ? (n.parent || null) : null, name: "", kw: "", color: "", num: ""};
+        nodes.push(m); st.sel = m.id; touched(); drawMap(); $("nodeEd").querySelector("input")?.focus(); return; }
+      if (act === "del" && n) { const gone = new Set([n.id]); let grew = true;
         while (grew) { grew = false; nodes.forEach(x => { if (x.parent && gone.has(x.parent) && !gone.has(x.id)) { gone.add(x.id); grew = true; } }); }
         if ((gone.size > 1 || n.name) && !confirm(`Remove "${n.name || "this market"}"${gone.size > 1 ? ` and ${gone.size - 1} under it` : ""}?`)) return;
-        st.plan.nodes = nodes.filter(x => !gone.has(x.id)); touched(); drawMap(); } });
+        st.plan.nodes = nodes.filter(x => !gone.has(x.id)); st.sel = null; touched(); drawMap(); } });
     for (const f of ["nonpr", "pr"]) {
       $(f).addEventListener("input", e => { const i = e.target.closest("[data-i]")?.dataset.i; if (i == null) return; st.plan[f][i][e.target.dataset.f] = e.target.value; touched(); });
       $(f).addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b) return;
-        if (b.dataset.act === "add") { (st.plan[f] = st.plan[f] || []).push({name: "", note: ""}); touched(); drawList(f, f === "pr" ? "Add a PR outlet or network" : "Add a source (e.g. G2, industry report)");
+        if (b.dataset.act === "add") { (st.plan[f] = st.plan[f] || []).push({name: "", note: ""}); touched(); drawList(f, f === "pr" ? "Add PR outlet" : "Add source");
           $(f).querySelector(".row-e:last-of-type input")?.focus(); }
         if (b.dataset.act === "del") { st.plan[f].splice(+b.closest("[data-i]").dataset.i, 1); touched(); drawMap(); } });
     }
-    $("mmEdit").onclick = () => { st.editing = !st.editing; drawMap(); };
+    $("mmEdit").onclick = () => { st.editing = !st.editing; if (st.editing && !st.sel) st.sel = (st.plan.nodes[0] || {}).id || null; drawMap(); };
     $("mmSave").onclick = save;
   }
   async function save() {
@@ -109,17 +130,20 @@
     try {
       const {data: cur} = await SB.from("planning").select("updated_at,updated_by").eq("client", key).maybeSingle();
       if (cur && st.planAt && cur.updated_at > st.planAt && !confirm(`${(cur.updated_by || "Someone").split("@")[0]} saved this map at ${fmtT(cur.updated_at)}, after you opened it. Overwrite with your version?`)) throw new Error("cancelled");
-      const clean = {nodes: st.plan.nodes.filter(n => n.name || n.kw), nonpr: (st.plan.nonpr || []).filter(x => x.name), pr: (st.plan.pr || []).filter(x => x.name)};
+      const clean = {nodes: st.plan.nodes.filter(n => n.name || n.kw || st.plan.nodes.some(c => c.parent === n.id)), nonpr: (st.plan.nonpr || []).filter(x => x.name), pr: (st.plan.pr || []).filter(x => x.name)};
       const now = new Date().toISOString(), email = (window.__me || {}).email || "";
       const {error} = await SB.from("planning").upsert({client: key, data: clean, updated_at: now, updated_by: email}, {onConflict: "client"});
       if (error) throw error;
-      st.plan = clean; st.planAt = now; st.planBy = email; st.hasDraft = false; lsSet(draftKey(), null); st.editing = false; drawMap();
+      st.plan = clean; st.planAt = now; st.planBy = email; st.hasDraft = false; lsSet(draftKey(), null); st.editing = false; st.sel = null; drawMap();
     } catch (e) { if (e.message !== "cancelled") alert("Not saved: " + (e.message || e)); }
     b.textContent = "Save"; b.disabled = st.store !== "ok";
   }
 
-  // ---------- 2. refill by day ----------
-  const isoDay = s => (String(s || "").match(/^\d{4}-\d{2}-\d{2}/) || [""])[0];
+  // ---------- 2. refill by day: Dates | Stock | one column per source | Total ----------
+  const MON = {jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12};
+  const isoDay = s => { s = String(s || "").trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0];
+    m = s.match(/^(\d{1,2})[ -]([A-Za-z]{3})[a-z]*[ -,]*(\d{4})/); if (m && MON[m[2].toLowerCase()]) return `${m[3]}-${String(MON[m[2].toLowerCase()]).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`; return ""; };
   function trackerStats() {
     const t = st.trackers[key]; if (!t) return null;
     const [h, ...rows] = t.rows, ix = n => h.findIndex(x => String(x).toLowerCase().startsWith(n));
@@ -136,19 +160,19 @@
     if (st.status) { const [h, ...rows] = st.status.rows, i = n => h.findIndex(x => String(x).toLowerCase().startsWith(n));
       const iD = i("date"), iC = i("client"), iW = i("waiting"), iA = i("added"), iL = i("left");
       rows.filter(r => r[iC] === name).forEach(r => stat[isoDay(r[iD])] = {bank: r[iW], added: r[iA], left: r[iL]}); }
-    if (!ts && !Object.keys(stat).length) { $("refill").innerHTML = `<p class="empty" style="padding:14px">No tracker or Status rows copied for ${esc(CLIENTS[key][0])} yet.</p>`; $("rfMeta").textContent = ""; return; }
+    if (!ts && !Object.keys(stat).length) { $("refill").innerHTML = `<p class="empty" style="padding:14px">No Outreach Tracker copied for ${esc(CLIENTS[key][0])} yet.</p>`; $("rfMeta").textContent = ""; return; }
     const srcs = ts ? Object.keys(ts.by).sort((a, b) => ts.by[b].n - ts.by[a].n) : [];
     const days = new Set(Object.keys(stat)); (ts ? ts.recs : []).forEach(r => days.add(r.day));
-    const list = [...days].sort((a, b) => (b || "0").localeCompare(a || "0"));  // undated last
+    const list = [...days].sort((a, b) => (b || "0").localeCompare(a || "0"));  // newest first, "before dates" last
     const cnt = {}; (ts ? ts.recs : []).forEach(r => { const k = r.day + "|" + r.src; cnt[k] = (cnt[k] || 0) + 1; });
-    const num = v => v ? String(v) : `<span class="z">0</span>`, tot = {};
+    const num = v => v ? String(v) : `<span class="z">–</span>`, tot = {};
     const body = list.map(d => { let sum = 0; const cells = srcs.map(s => { const v = cnt[d + "|" + s] || 0; sum += v; tot[s] = (tot[s] || 0) + v; return `<td>${num(v)}</td>`; }).join("");
-      const b = stat[d]; return `<tr><td>${d ? fmtD(d) : "Undated"}</td><td title="${b ? `Status: waiting at start ${esc(b.bank)}, added ${esc(b.added)}, left in pool ${esc(b.left)}` : "No Status row this day"}">${b ? esc(b.bank) : `<span class="z">–</span>`}</td>${cells}<td><b>${num(sum)}</b></td></tr>`; }).join("");
+      const b = stat[d]; return `<tr${d ? "" : ' class="undated"'}><td>${d ? fmtD(d) : "Before dates were kept"}</td><td title="${b ? `Status tab: waiting at start ${esc(b.bank)}, added ${esc(b.added)}, left in pool ${esc(b.left)}` : "No Status row this day"}">${b ? esc(b.bank) : `<span class="z">–</span>`}</td>${cells}<td><b>${num(sum)}</b></td></tr>`; }).join("");
     const all = srcs.reduce((a, s) => a + tot[s], 0);
     const inBank = ts ? ts.recs.filter(r => !r.sent).length : null;
-    $("refill").innerHTML = `<table class="t"><thead><tr><th>Date</th><th title="Status tab: waiting at start of the day">Companies in bank</th>${srcs.map(s => `<th>${esc(s)}</th>`).join("")}<th>Total</th></tr></thead>
+    $("refill").innerHTML = `<table class="t"><thead><tr><th>Date</th><th title="Companies waiting at the start of the day (Status tab)">Stock</th>${srcs.map(s => `<th>${esc(s)}</th>`).join("")}<th>Total added</th></tr></thead>
       <tbody>${body}</tbody><tfoot><tr><td>Total</td><td title="Tracker rows not emailed yet">${inBank == null ? "–" : inBank + " now"}</td>${srcs.map(s => `<td>${tot[s]}</td>`).join("")}<td>${all}</td></tr></tfoot></table>`;
-    $("rfMeta").textContent = "Companies added per source by 'Date added' (Outreach Tracker) · bank = Status 'waiting at start'";
+    $("rfMeta").textContent = "Companies added per source, by 'Date added' in the Outreach Tracker";
   }
 
   // ---------- 3. DR growth ----------
@@ -199,29 +223,27 @@
     $("drhit").addEventListener("pointermove", move); $("drhit").addEventListener("pointerdown", move); $("drhit").addEventListener("pointerleave", out);
   }
 
-  // ---------- 4. sources ----------
+  // ---------- 4. sources: one simple table, rows in the sketch's order ----------
   function drawSources() {
-    const ts = trackerStats(), by = ts ? ts.by : {}, site = (st.sites[CLIENTS[key][1]] || {}).rows || {};
-    const pick = re => Object.entries(by).filter(([s]) => re.test(s));
-    const rows = list => list.length ? list.map(([s, v]) => `<span>${esc(s)}</span><b>${v.n}${v.last ? ` · last ${fmtD(v.last)}` : ""}</b>`).join("") : `<span>In tracker</span><b>0</b>`;
+    const ts = trackerStats(), by = ts ? ts.by : {}, recs = ts ? ts.recs : [];
+    const sum = re => { const l = Object.entries(by).filter(([s]) => re.test(s)); return {n: l.reduce((a, [, v]) => a + v.n, 0), last: l.map(([, v]) => v.last).sort().pop() || "", names: l.map(([s]) => s)}; };
     const pill = (k, t) => `<span class="pill ${k}">${t}</span>`;
-    const ai = pick(/peec|maxvisibility|visibility/i), ah = pick(/ahrefs|backlink/i);
-    const recs = ts ? ts.recs : [], apo = recs.filter(r => r.apollo).length, seqs = new Set(recs.map(r => r.seq).filter(s => s && !/manual/i.test(s)));
-    const known = /peec|maxvisibility|visibility|ahrefs|backlink/i, other = Object.entries(by).filter(([s]) => !known.test(s));
-    const cards = [
-      ["AI visibility", "Peec · MaxVisibility", ai.length ? pill("on", "In use") : pill("part", "Not used yet"),
-        `<div class="kv">${rows(ai)}</div><p class="note">Companies whose articles AI answers cite. <a href="https://app.peec.ai" target="_blank" rel="noopener">Open Peec</a></p>`],
-      ["Ahrefs competitive analysis", "Competitor backlinks", ah.length ? pill("part", "CSV / on request") : pill("off", "Not used yet"),
-        `<div class="kv">${rows(ah)}</div><p class="note">Pulls cost Ahrefs units: asked for each time. DR for ${esc(CLIENTS[key][2])}: <b>${window.DR && window.DR[CLIENTS[key][2]] != null ? window.DR[CLIENTS[key][2]] : st.dr[key] ? (st.dr[key].rows.weeks || []).slice(-1)[0]?.[1] ?? "–" : "–"}</b></p>`],
-      ["Directory & review sites", "G2, Capterra, niche directories", pill("off", "Not connected"), `<p class="note">No feed yet. List the ones that matter under "Authoritative non-PR sources" in the market map.</p>`],
-      ["PR network", "Outlets and journalists", pill("off", "Not connected"), `<p class="note">No feed yet. Keep target outlets in the PR list in the market map.</p>`],
-      ["Apollo", "Accounts, people, sequences", apo ? pill("on", "Connected") : pill("part", "No accounts yet"),
-        `<div class="kv"><span>Companies with an Apollo account</span><b>${apo}</b><span>Emailed</span><b>${recs.filter(r => r.sent).length}</b><span>Replied</span><b>${recs.filter(r => r.rep).length}</b><span>Sequences</span><b>${seqs.size}</b>
-         ${site.emails != null ? `<span>Emails sent (desk)</span><b>${site.emails}</b><span>Replies (desk)</span><b>${site.replies ?? "–"}</b>` : ""}</div>`],
+    const ai = sum(/peec|maxvisibility|visibility/i), ah = sum(/ahrefs|backlink/i), dir = sum(/directory|review|g2|capterra/i), prn = sum(/\bpr\b|press|journalist/i);
+    const known = /peec|maxvisibility|visibility|ahrefs|backlink|directory|review|g2|capterra|\bpr\b|press|journalist/i;
+    const other = Object.entries(by).filter(([s]) => !known.test(s)).sort((a, b) => b[1].n - a[1].n);
+    const apo = recs.filter(r => r.apollo).length, sent = recs.filter(r => r.sent).length, rep = recs.filter(r => r.rep).length;
+    const row = (name, sub, s, status) => `<tr><td><b>${name} ${status}</b><small>${sub}</small></td><td class="r">${s.n || `<span class="muted">0</span>`}</td><td class="r">${s.last ? new Date(s.last + "T00:00:00").toLocaleDateString("en-GB", {day: "numeric", month: "short"}) : `<span class="muted">–</span>`}</td></tr>`;
+    const rows = [
+      row("AI Visibility", ai.names.join(" · ") || "Peec · MaxVisibility", ai, ai.n ? pill("on", "In use") : pill("part", "Not used")),
+      row("Ahrefs Competitive Analysis", ah.names.join(" · ") || "Competitor backlinks", ah, ah.n ? pill("part", "On request") : pill("off", "Not used")),
+      row("Directory Submission and Review Sites", "G2, Capterra, niche directories", dir, dir.n ? pill("on", "In use") : pill("off", "No feed")),
+      ...other.map(([s, v]) => row(esc(s), "Other tracker source", v, pill("on", "In use"))),
+      ...(other.length ? [] : [`<tr class="blank"><td colspan="3"></td></tr>`]),
+      row("PR Network", "Outlets and journalists", prn, prn.n ? pill("on", "In use") : pill("off", "No feed")),
+      `<tr><td><b>Apollo ${apo ? pill("on", "Connected") : pill("part", "No accounts")}</b><small>${sent} emailed · ${rep} replied</small></td><td class="r">${apo || `<span class="muted">0</span>`}</td><td class="r"><span class="muted">–</span></td></tr>`,
     ];
-    if (other.length) cards.push(["Other tracker sources", "Web search, retries, manual", pill("on", "In tracker"), `<div class="kv">${rows(other)}</div>`]);
-    $("sources").innerHTML = (ts ? "" : `<p class="empty">No Outreach Tracker copied for ${esc(CLIENTS[key][0])}, so no counts.</p>`)
-      + cards.map(([t, s, p, b]) => `<article class="src"><div class="src-h"><b>${t}</b>${p}</div><span class="muted small">${s}</span>${b}</article>`).join("");
+    $("sources").innerHTML = `<table class="st"><thead><tr><th>Source</th><th class="r">Companies</th><th class="r">Last added</th></tr></thead><tbody>${rows.join("")}</tbody></table>`
+      + (ts ? "" : `<p class="empty">No Outreach Tracker copied for ${esc(CLIENTS[key][0])}, so counts are 0.</p>`);
   }
 
   // ---------- page ----------
