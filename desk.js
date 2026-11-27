@@ -350,9 +350,17 @@ function renderComposer() {
   const c = clientOf(S.sel.key);
   const subj = "Re: " + (t.subject || "").replace(/^(re:\s*)+/i, "");
   const askBar = (label, ph) => `<div class="gm-ask"><span aria-hidden="true">✦</span><input id="instr" placeholder="${ph}" aria-label="Instruction for Claude"><button id="go">${label}</button></div>`;
+  if (S.sent[S.sel.tid] || (j && j.status === "sent")) {
+    box.innerHTML = `<div class="wait"><div><b>Sent ✓</b><span class="m">Your reply went out from ${esc(t.mailbox || "")}. It leaves the count now; it comes back only when they write again.</span></div></div>`;
+    return;
+  }
+  if (S.sending[S.sel.tid]) {
+    box.innerHTML = `<div class="wait"><span class="spin"></span><div><b>Sending…</b><span class="m">Sending through Gmail now, a few seconds.</span></div></div>`;
+    return;
+  }
   if (j && /^(working|sending)/.test(j.status)) {
     box.innerHTML = `<div class="wait"><span class="spin"></span><div><b>${j.status === "sending" ? "Sending…" : "Claude is drafting"}</b>
-      <span class="m">${j.instruction ? `“${esc(j.instruction)}” · ` : ""}Move on to the next email; you'll get a note when it's ready.</span></div></div>`;
+      <span class="m">${j.status === "sending" ? "Queued for the desk run." : (j.instruction ? `“${esc(j.instruction)}” · ` : "") + "Move on to the next email; you'll get a note when it's ready."}</span></div></div>`;
     return;
   }
   if (!r || (r.category === "no-reply-needed" && !r.draft_body)) {
@@ -391,6 +399,15 @@ async function act(what, body, ok) {
   try { await api(`/api/clients/${S.sel.key}/threads/${encodeURIComponent(S.sel.tid)}/${what}`, body); toast(ok + " (queued for Claude)"); }
   catch (e) { toast(e.message, true); }
 }
+// Send goes straight out through the send-reply function (Supabase → Composio → Gmail): no PC, no Claude.
+S.sent = {}; S.sending = {};
+async function sendNow(payload) {
+  await window.whenAuthed;
+  const {data, error} = await SB.functions.invoke("send-reply", {body: payload});
+  if (error) { let m = error.message; try { const j = await error.context.json(); if (j && j.error) m = j.error; } catch (e) {} throw new Error(m); }
+  if (!data || !data.ok) throw new Error((data && data.error) || "no answer");
+  return data;
+}
 function confirmSend() {
   const t = S.thread, to = $("#to").value.trim(), body = $("#body").value.trim();
   if (!to || !body) return toast("To and reply text are needed", true);
@@ -399,9 +416,13 @@ function confirmSend() {
   const dlg = $("#confirm");
   dlg.onclose = async () => {
     if (dlg.returnValue !== "send") return;
-    try { await api(`/api/clients/${S.sel.key}/threads/${encodeURIComponent(S.sel.tid)}/send`, {confirm: "SEND", to, body, mailbox: t.mailbox});
-      toast(`Send queued from ${t.mailbox}`); S.jobs[S.sel.tid] = Object.assign({}, S.jobs[S.sel.tid], {status: "sending"}); renderComposer(); }
-    catch (e) { toast("Not sent: " + e.message, true); }
+    const key = S.sel.key, tid = S.sel.tid;
+    S.sending[tid] = 1; renderComposer();
+    try { await sendNow({client: key, thread_id: tid, to, body, mailbox: t.mailbox, confirm: "SEND"});
+      delete S.sending[tid]; S.sent[tid] = Date.now();
+      if (S.mc) S.mc.rows = (S.mc.rows || []).filter(r => r.thread_id !== tid);
+      toast(`Sent from ${t.mailbox}`); await loadQueue(); renderRail(); if (S.sel && S.sel.tid === tid) openThread(key, tid, true); }
+    catch (e) { delete S.sending[tid]; if (S.sel && S.sel.tid === tid) renderComposer(); toast("Not sent: " + e.message, true); }
   };
   dlg.showModal();
 }
