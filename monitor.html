@@ -617,12 +617,12 @@ table.led td.muted { color: var(--text3) }
   function homeQueue(d) {
     const cs = d.clients.filter(c => !c.placeholder);
     $("home-queue").replaceChildren(el("div", { class: "queue" },
-      el("div", { class: "queue-head" }, el("h3", { text: "Emails scheduled" }), el("span", { text: "Companies in each sequence not emailed yet · refill when below 20" })),
+      el("div", { class: "queue-head" }, el("h3", { text: "Emails scheduled" }), el("span", { text: "New companies in the sequences that nobody has emailed yet (all of a client’s senders) · refill when below 20" })),
       el("div", { class: "queue-grid" }, ...cs.map(c => {
         const v = c.queued_cos, low = typeof v === "number" && v < 20;
         return el("a", { class: "q" + (low ? " low" : ""), href: "monitor.html?c=" + c.slug }, c.name,
           el("b", { text: v == null ? "–" : String(v) }),
-          el("small", { text: `companies · ${c.queued_people == null ? "–" : c.queued_people} people waiting` + (low ? " · refill" : "") }));
+          el("small", { text: `companies · ${c.queued_people == null ? "–" : c.queued_people} people there, none emailed yet` + (low ? " · refill" : "") }));
       }))));
   }
 
