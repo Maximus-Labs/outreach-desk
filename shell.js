@@ -62,6 +62,7 @@
   .cb-f button{all:unset;cursor:pointer;align-self:end;padding:9px 14px;border-radius:999px;background:#0070e0;color:#fff;font-size:13.5px;font-weight:500}
   .cb-f button[disabled]{opacity:.5;pointer-events:none}`;
 
+  const SC = {};  // cached desk_state values by key: {at, value, got}
   let page = "monitoring", client = "", onClient = null, chatSeen = 0, ovCounts = {}, mc = null, local = {minus: {}, late: null, mc: null}, upd = "", lastHtml = "";
   const FRESH = 14 * 864e5;  // one source: the cloud mail check (mail_counts) is always used; an old one shows its time in amber, never a different count
   const fresh = m => !!(m && m.at && Date.now() - Date.parse(m.at) < FRESH);
@@ -110,8 +111,12 @@
   async function refreshStatus() {
     try {
       await window.whenAuthed;
-      const {data} = await SB.from("desk_state").select("key,value,updated_at").in("key", ["overview", "jobs", "mail_counts"]);
-      const get = k => ((data || []).find(r => r.key === k) || {}).value;
+      // only the saved times first (a few bytes); values are downloaded again only when changed, or every 2 minutes
+      const keys = ["overview", "jobs", "mail_counts"], {data: meta} = await SB.from("desk_state").select("key,updated_at").in("key", keys);
+      const stale = keys.filter(k => { const c = SC[k], m = (meta || []).find(r => r.key === k); return !c || !m || m.updated_at !== c.at || Date.now() - c.got > 120e3; });
+      if (stale.length) { const {data} = await SB.from("desk_state").select("key,value,updated_at").in("key", stale);
+        (data || []).forEach(r => SC[r.key] = {at: r.updated_at, value: r.value, got: Date.now()}); }
+      const get = k => (SC[k] || {}).value;
       const ov = get("overview"), jb = get("jobs");
       if (ov) { ovCounts = {}; (ov.clients || []).forEach(c => ovCounts[c.key] = c.reply); }
       mc = get("mail_counts") || null;
@@ -211,7 +216,7 @@
       if (me.role === "client" && page !== "client") { location.replace("client.html"); return; }
       if (me.role === "client") { renderClientSide(me); return; }
       render(); chatUI(); refreshStatus(); loadChat();
-      setInterval(refreshStatus, 15000);
+      setInterval(() => { if (!document.hidden) refreshStatus(); }, 15000);  // paused while the tab is hidden
       setInterval(() => { if (!document.querySelector(".cb").hidden) loadChat(); }, 5000);
     },
     setClient, refresh: refreshStatus, mailCounts, keyOf, isFresh: fresh,

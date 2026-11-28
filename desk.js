@@ -2,8 +2,15 @@
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 // Every read comes from Supabase (after login); every action is a request row the PC worker handles.
-const snap = async key => { await window.whenAuthed; const {data, error} = await SB.from("desk_state").select("value,updated_at").eq("key", key).maybeSingle();
-  if (error) throw new Error(error.message); return data ? data.value : null; };
+// Free-plan data limit: ask only for the saved time (a few bytes); download the value again only when that time
+// changed, or every 2 minutes as a safety net.
+const SNAP = {};
+const snap = async key => { await window.whenAuthed;
+  const c = SNAP[key], fresh = c && Date.now() - c.got < 120e3;
+  if (fresh) { const {data: m, error: e} = await SB.from("desk_state").select("updated_at").eq("key", key).maybeSingle();
+    if (e) throw new Error(e.message); if (m && m.updated_at === c.at) return c.value; }
+  const {data, error} = await SB.from("desk_state").select("value,updated_at").eq("key", key).maybeSingle();
+  if (error) throw new Error(error.message); SNAP[key] = {at: data && data.updated_at, value: data ? data.value : null, got: Date.now()}; return SNAP[key].value; };
 const openReqs = async () => { const {data, error} = await SB.from("requests").select("id,type,client,thread_id,payload,status,created_at").in("status", ["pending", "received"]).order("created_at");
   if (error) throw new Error(error.message); return data || []; };
 const addReq = async (type, client, thread_id, payload) => { await window.whenAuthed;
@@ -560,4 +567,5 @@ document.addEventListener("keydown", e => {
 });
 S.client = new URLSearchParams(location.search).get("c") || "";
 Shell.mount("reply", S.client, k => pickClient(k));
-tick(); setInterval(tick, 3500);
+tick(); setInterval(() => { if (!document.hidden) tick(); }, 5000);  // paused while the tab is hidden
+document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
