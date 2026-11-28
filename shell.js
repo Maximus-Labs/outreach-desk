@@ -23,6 +23,7 @@
   .sb .sb-count:empty{display:none}
   .sb .sb-count.late{background:#e5484d}
   .sb-set{margin-top:auto}
+  .sb-mc{color:#757575}.sb-mc.warn{color:#f5a524}
   .sb-worker{display:flex;align-items:center;gap:8px;font-family:Geist,system-ui,sans-serif;color:#ababab}
   .sb-worker i{width:8px;height:8px;border-radius:50%;background:#757575;flex:none}.sb-worker.on i{background:#3dd68c}.sb-worker.off i{background:#f5a524}
   /* client-only side (client.html) */
@@ -62,7 +63,7 @@
   .cb-f button[disabled]{opacity:.5;pointer-events:none}`;
 
   let page = "monitoring", client = "", onClient = null, chatSeen = 0, ovCounts = {}, mc = null, local = {minus: {}, late: null, mc: null}, upd = "", lastHtml = "";
-  const FRESH = 3 * 3600e3;  // mail_counts (cloud mail check) is used while under 3 h old
+  const FRESH = 14 * 864e5;  // one source: the cloud mail check (mail_counts) is always used; an old one shows its time in amber, never a different count
   const fresh = m => !!(m && m.at && Date.now() - Date.parse(m.at) < FRESH);
   const curMc = () => { const a = fresh(mc) ? mc : null, b = fresh(local.mc) ? local.mc : null;
     return a && b ? (Date.parse(b.at) >= Date.parse(a.at) ? b : a) : a || b; };
@@ -89,6 +90,8 @@
       CLIENTS.map(([k, slug, n]) => `<a class="sb-btn" data-k="${k}" href="${href(k, slug)}" ${sel === k ? 'aria-current="page"' : ""} title="${esc(n)} · ${countOf(k)} need our reply"><span>${esc(n)}</span><b class="sb-count${lateOf(k) ? " late" : ""}">${countOf(k) || ""}</b></a>`).join("") +
       `</div>` + btn("settings.html", "⚙ Settings", null, page === "settings", 'class="sb-btn sb-set"').replace('class="sb-btn" ', "") +
       `<div class="sb-foot"><span class="sb-worker ${on === undefined ? "" : on ? "on" : "off"}" id="sbWorker"><i></i><span id="sbWorkerT">${on === undefined ? "Checking…" : on ? "Claude online" : "Claude offline"}</span></span>` +
+      (() => { const m = curMc(); if (!m) return `<span class="sb-mc warn">Mail check: no data</span>`; const age = Date.now() - Date.parse(m.at);
+        return `<span class="sb-mc${age > 90 * 6e4 || m.ok === false ? " warn" : ""}" title="Counts come from the cloud mail check (GitHub, every 30 min)">Mail checked ${new Date(m.at).toLocaleString([], age > 864e5 ? {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"} : {hour: "2-digit", minute: "2-digit"})}${m.ok === false ? " · errors" : ""}</span>`; })() +
       `<span id="updated">${esc(upd)}</span><a href="#" id="sbOut">Sign out</a></div>`;
     if (html === lastHtml) return; lastHtml = html; nav.innerHTML = html;  // no redraw when nothing changed (keeps focus)
     nav.querySelector("#sbOut").onclick = e => { e.preventDefault(); window.signOut && window.signOut(); };

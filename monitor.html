@@ -133,6 +133,13 @@ textarea.body { width: 100%; min-height: 220px; resize: vertical }
 .btn.danger { color: var(--bad); border-color: rgba(255, 107, 107, .4); background: transparent }
 .btn:disabled { opacity: .45; cursor: not-allowed }
 .hint { font-size: 13px; color: var(--text3) }
+.ledf { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px }
+.ledf .lf { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; color: var(--text2); box-shadow: inset 0 0 0 1px var(--line) }
+.ledf .lf b { font: 500 11px var(--mono); color: var(--text3) }
+.ledf .lf:hover { color: var(--text); background: var(--raised) }
+.ledf .lf.on { color: var(--text); background: var(--raised); box-shadow: inset 0 0 0 1.5px var(--accent) }
+.ledf .lf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.ledf[hidden] { display: none }
 .hint.err { color: var(--bad) }
 .hint.ok { color: var(--good) }
 .confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: var(--r-ui); background: var(--sky-soft); font-size: 13.5px }
@@ -388,7 +395,7 @@ table.led td.muted { color: var(--text3) }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
-<script src="shell.js?v=4.1"></script>
+<script src="shell.js?v=4.2"></script>
 <script src="dr.js"></script>
 </head>
 <body>
@@ -531,7 +538,10 @@ table.led td.muted { color: var(--text3) }
     c.alerts = (c.alerts || []).filter(a => !/^Bounce rate/.test(a));
     const card = el("article", { class: "card" });
     const n = v => v === "" || v == null ? "–" : String(v);
-    const ex = c.exchange || { companies: 0, swaps: 0 };
+    // Exchange total = the exchanges listed for this client (older and hand-added ones included), so the number always matches the table
+    const exL = c.exchanges || [], nUrl = v => String(v || "").split(/\n+/).filter(u => u.trim()).length;
+    const ex = exL.length ? { swaps: exL.reduce((a, x) => a + Math.max(1, nUrl(x.their_url), nUrl(x.our_url)), 0), companies: new Set(exL.map(x => x.partner)).size }
+      : (c.exchange || { companies: 0, swaps: 0 });
     const recv = () => overlay(`Emails received · ${n(c.replies)} companies`, c.ov_received || [], `${c.reply_people || 0} people from ${n(c.replies)} companies`, coCat(c));
     const openOv = () => overlay(`Open threads · ${(c.ov_open || []).length} companies`, c.ov_open || [], "Sorted by where each conversation stands", coCat(c));
     // Needs our reply: the cloud mail check (same total as the sidebar) when fresh, else the report
@@ -887,10 +897,10 @@ table.led td.muted { color: var(--text3) }
   const originTag = x => { const o = ORIGIN[x.origin]; return o ? el("small", { class: `otag ${o[1]}`, text: o[0], title: o[2] }) : null; };
   // Exchanges one per pair of pages (a sheet cell may hold several links, one per line), grouped by partner:
   // partners with the most exchanges first, then the newest.
-  const exPairs = c => {
+  const exPairs = (c, led) => {
     const urls = v => String(v || "").split(/\n+/).map(u => u.trim()).filter(Boolean);
     const out = [];
-    for (const x of c.exchanges || []) { const t = urls(x.their_url), o = urls(x.our_url), n = Math.max(1, t.length, o.length);
+    for (const x of (c.exchanges || []).filter(x => !led || (led === "none" ? !ORIGIN[x.origin] : x.origin === led))) { const t = urls(x.their_url), o = urls(x.our_url), n = Math.max(1, t.length, o.length);
       for (let i = 0; i < n; i++) out.push({ ...x, their_url: t[i] || "", our_url: o[i] || "", _c: c.name, _cn: String(c.name || "").replace(/ AI$/, ""), _chk: c.link_checks }); }
     const by = new Map(); for (const x of out) { if (!by.has(x.partner)) by.set(x.partner, []); by.get(x.partner).push(x); }
     const gs = [...by.values()].map(g => g.sort((a, b) => (a.live || "").localeCompare(b.live || "")));
@@ -928,9 +938,17 @@ table.led td.muted { color: var(--text3) }
     $("client-card").replaceChildren(card(c, null));
     calendar($("client-cal"), c.days || {}, () => {});
     perf($("client-perf"), trendOf(c), c.outcomes ? [{ outcomes: c.outcomes, client: c }] : []);
-    let current = "completed";
+    let current = "completed", ledF = "";
+    const ledBar = () => {  // Led-by filter for the Completed exchanges (internal page only; the client page has none)
+      let bar = $("ledf"); if (!bar) { bar = el("div", { id: "ledf", class: "ledf", role: "group", "aria-label": "Filter by who led the exchange" }); $("st-wrap").before(bar); }
+      bar.hidden = current !== "completed"; if (bar.hidden) return;
+      const cnt = k => exPairs(c, k).length;
+      const opts = [["", "All"], ["us", "MaximusLabs-led"], ["client", "Co-led"], ["client_only", "Client-led"], ["none", "Not tagged"]].filter(([k]) => !k || k === ledF || cnt(k));
+      bar.replaceChildren(...opts.map(([k, l]) => { const b = el("button", { type: "button", class: "lf" + (k === ledF ? " on" : ""), "aria-pressed": String(k === ledF) }, l, el("b", { text: String(cnt(k)) }));
+        b.onclick = () => { ledF = k; show("completed"); }; return b; }));
+    };
     const show = key => {
-      current = key; const v = VIEWS.find(v => v.key === key); const rows = v.rows ? v.rows(c) : (c[key] || []);
+      current = key; const v = VIEWS.find(v => v.key === key); const rows = v.rows ? v.rows(c, ledF) : (c[key] || []); ledBar();
       for (const b of $("seg").children) b.setAttribute("aria-selected", String(b.dataset.key === key));
       $("st-hint").replaceChildren(v.hint + " DR: ", el("a", { href: "https://ahrefs.com/", target: "_blank", rel: "noopener", text: "Domain Rating by Ahrefs" }), ".");
       $("copy-ex").hidden = key !== "completed" || !rows.length;

@@ -107,7 +107,7 @@ async function tick() {
     S.jobs = next;
     const [ov, chat, cl, mc] = await Promise.all([api("/api/overview"), snap("chat"), S.clients.length ? null : snap("clients"), snap("mail_counts")]);
     S.overview = ov; S.chat = chat || []; if (cl) S.clients = cl;
-    S.mc = mc && mc.at && Date.now() - new Date(mc.at) < 3 * 3600e3 ? mc : null;  // cloud mail counts, used while fresh (< 3 h)
+    S.mc = mc && mc.at ? mc : null;  // one source: the cloud mail counts, whatever their age (the banner warns when old)
     mailWarn(mc);
     await loadQueue();
     renderRail();
