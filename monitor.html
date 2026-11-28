@@ -565,7 +565,7 @@ table.led td.muted { color: var(--text3) }
         ["Exchange", String(ex.companies), "companies"],
       ] : [
         ["Emails scheduled", n(c.scheduled), "people"],
-        ["Emails sent", n(c.sent_total ?? c.sent), "people", () => sentBox(c)],
+        ["Emails sent", n(Math.max(c.sent_total || 0, c.sent || 0) || (c.sent_total ?? c.sent)), "people", () => sentBox(c)],
         ["Emails received", String(c.reply_people || 0), "people", recv],
         ["Open threads", String(peopleIn(c.ov_open)), "people", openOv],
         ["Needs our reply", String(mcN ?? peopleIn(c.ov_reply)), mcN != null ? "threads" : "people", replyOv, (mcN ?? peopleIn(c.ov_reply)) > 0],
